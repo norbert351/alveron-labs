@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Loader2, Save, KeyRound, Plus, Trash2, CalendarClock, Mail, AlertOctagon, Users } from 'lucide-react';
-import { api, type EmailSafety } from '@/lib/api';
+import { api, type SettingsData, type EmailSafety } from '@/lib/api';
 import { getSessionUser } from '@/lib/auth';
 
 export default function SettingsPage() {

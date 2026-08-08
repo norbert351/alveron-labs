@@ -1,7 +1,7 @@
 const API = process.env.NEXT_PUBLIC_API_URL || '';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options?.headers || {}) };
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...((options?.headers || {}) as Record<string, string>) };
   if (typeof window !== 'undefined') {
     const t = localStorage.getItem('alveron_session_token');
     if (t) headers['X-User-Token'] = t;
@@ -254,6 +254,7 @@ export interface EmailAccount {
   purpose: 'outreach' | 'transactional';
   is_default: boolean;
   status: 'connected' | 'disconnected' | 'error' | 'pending';
+  scopes: string[];
   last_token_refresh_at: string | null;
   last_send_at: string | null;
   daily_send_count: number;
