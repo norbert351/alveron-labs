@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import pg from 'pg';
 import { config } from './config.ts';
+import { runMigrations } from './db/migrations.ts';
 
 const { Pool } = pg;
 
@@ -13,6 +14,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 export async function initDb() {
   const sql = readFileSync(join(__dirname, 'db', 'schema.sql'), 'utf8');
   await pool.query(sql);
+  await runMigrations();
   await seedDefaults();
 }
 
@@ -46,6 +48,19 @@ async function seedDefaults() {
       ]
     );
   }
+  const seq = await pool.query(`SELECT key FROM settings WHERE key = 'follow_up'`);
+  if (seq.rowCount === 0) {
+    await pool.query(
+      `INSERT INTO settings (key, value) VALUES ('follow_up', $1)`,
+      [
+        JSON.stringify({
+          enabled: true,
+          days: [0, 4, 9],
+          max_follow_ups: 2,
+        }),
+      ]
+    );
+  }
 }
 
 export async function getSetting(key: string): Promise<any> {
@@ -58,5 +73,25 @@ export async function setSetting(key: string, value: unknown) {
     `INSERT INTO settings (key, value) VALUES ($1, $2)
      ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
     [key, JSON.stringify(value)]
+  );
+}
+
+export async function logActivity(input: {
+  actor?: string;
+  action: string;
+  entityType?: string;
+  entityId?: number;
+  detail?: Record<string, unknown>;
+}) {
+  await pool.query(
+    `INSERT INTO activity_logs (actor, action, entity_type, entity_id, detail)
+     VALUES ($1, $2, $3, $4, $5)`,
+    [
+      input.actor || 'system',
+      input.action,
+      input.entityType || null,
+      input.entityId || null,
+      JSON.stringify(input.detail || {}),
+    ]
   );
 }

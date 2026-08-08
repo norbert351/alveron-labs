@@ -1,0 +1,231 @@
+{
+  "name": "Alveron Company Analysis",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alveron-company",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "n1",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-880, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:3100/api/webhook/company",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ name: $json.body.name, website: $json.body.website, notes: $json.body.notes }) }}",
+        "options": {}
+      },
+      "id": "n2",
+      "name": "Create Company",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-680, 0]
+    },
+    {
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": 30,
+        "unit": "seconds"
+      },
+      "id": "n3",
+      "name": "Wait 30s",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1,
+      "position": [-280, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://127.0.0.1:3100/api/webhook/company/{{ $json.company.id }}/status",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n4",
+      "name": "Get Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-80, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.job.status }}",
+              "rightValue": "completed",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "n5",
+      "name": "Is Completed?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [120, 0]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "iterations",
+              "value": "={{ ($json.iterations || 0) + 1 }}",
+              "type": "number"
+            }
+          ]
+        }
+      },
+      "id": "n6",
+      "name": "Count Iterations",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [340, 240]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "c2",
+              "leftValue": "={{ $json.iterations }}",
+              "rightValue": "20",
+              "operator": { "type": "number", "operation": "gte" }
+            }
+          ]
+        }
+      },
+      "id": "n7",
+      "name": "Max Reached?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [540, 240]
+    },
+    {
+      "parameters": {
+        "errorMessage": "Alveron analysis did not finish within 20 polling intervals"
+      },
+      "id": "n8",
+      "name": "Stop and Error",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1.1,
+      "position": [740, 360]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://127.0.0.1:3100/api/webhook/company/{{ $json.company.id }}/research",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n9",
+      "name": "Get Research",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [340, -200]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://127.0.0.1:3100/api/webhook/company/{{ $json.company.id }}/opportunities",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "n10",
+      "name": "Get Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [540, -200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:3100/api/webhook/opportunity/{{ $json.opportunities[0].id }}/proposal",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{}",
+        "options": {}
+      },
+      "id": "n11",
+      "name": "Generate Proposal",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [740, -200]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ company_id: $json.proposal.company_id, proposal_id: $json.proposal.id, status: 'proposal_ready' }) }}",
+        "options": {}
+      },
+      "id": "n12",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [940, -200]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [[{ "node": "Create Company", "type": "main", "index": 0 }]] },
+    "Create Company": { "main": [[{ "node": "Wait 30s", "type": "main", "index": 0 }]] },
+    "Wait 30s": { "main": [[{ "node": "Get Status", "type": "main", "index": 0 }]] },
+    "Get Status": { "main": [[{ "node": "Is Completed?", "type": "main", "index": 0 }]] },
+    "Is Completed?": {
+      "main": [
+        [{ "node": "Get Research", "type": "main", "index": 0 }],
+        [{ "node": "Count Iterations", "type": "main", "index": 0 }]
+      ]
+    },
+    "Count Iterations": { "main": [[{ "node": "Max Reached?", "type": "main", "index": 0 }]] },
+    "Max Reached?": {
+      "main": [
+        [{ "node": "Stop and Error", "type": "main", "index": 0 }],
+        [{ "node": "Wait 30s", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Research": { "main": [[{ "node": "Get Opportunities", "type": "main", "index": 0 }]] },
+    "Get Opportunities": { "main": [[{ "node": "Generate Proposal", "type": "main", "index": 0 }]] },
+    "Generate Proposal": { "main": [[{ "node": "Respond to Webhook", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

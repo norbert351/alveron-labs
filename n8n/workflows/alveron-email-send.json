@@ -1,0 +1,91 @@
+{
+  "name": "Alveron Email Send",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "minutes", "minutesInterval": 5 }
+          ]
+        }
+      },
+      "id": "e1",
+      "name": "Every 5 minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:3100/api/webhook/outreach-queue",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "e2",
+      "name": "Get Queue",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items"
+      },
+      "id": "e3",
+      "name": "Split Out Items",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EMAIL_PROVIDER_URL || 'http://127.0.0.1:3199/send' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $json.target_company, subject: $json.subject, html: $json.body, from: ($env.EMAIL_FROM || 'outreach@alveronlabs.dev') }) }}",
+        "options": {}
+      },
+      "id": "e4",
+      "name": "Send via Provider",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:3100/api/webhook/outreach/{{ $json.outreach_id }}/message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'sent', provider: $json.provider || 'email-provider', provider_message_id: $json.id || null }) }}",
+        "options": {}
+      },
+      "id": "e5",
+      "name": "Record Sent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 0]
+    }
+  ],
+  "connections": {
+    "Every 5 minutes": { "main": [[{ "node": "Get Queue", "type": "main", "index": 0 }]] },
+    "Get Queue": { "main": [[{ "node": "Split Out Items", "type": "main", "index": 0 }]] },
+    "Split Out Items": { "main": [[{ "node": "Send via Provider", "type": "main", "index": 0 }]] },
+    "Send via Provider": { "main": [[{ "node": "Record Sent", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

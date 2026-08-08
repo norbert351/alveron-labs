@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { pool } from '../db.ts';
+import { pool, logActivity } from '../db.ts';
 import { generateOutreach } from '../modules/Outreach.ts';
 
 export function registerOutreachRoutes(app: FastifyInstance) {
@@ -22,7 +22,16 @@ export function registerOutreachRoutes(app: FastifyInstance) {
        ${where} ORDER BY o.created_at DESC`,
       params
     );
-    reply.send({ outreach: res.rows });
+    const withMessages = await Promise.all(
+      res.rows.map(async (o) => {
+        const msgRes = await pool.query(
+          `SELECT * FROM outreach_messages WHERE outreach_id = $1 ORDER BY id DESC LIMIT 1`,
+          [o.id]
+        );
+        return { ...o, latest_message: msgRes.rows[0] || null };
+      })
+    );
+    reply.send({ outreach: withMessages });
   });
 
   app.get('/api/outreach/:id', async (req, reply) => {
@@ -34,7 +43,11 @@ export function registerOutreachRoutes(app: FastifyInstance) {
       [id]
     );
     if (res.rowCount === 0) return reply.code(404).send({ error: 'Outreach not found' });
-    reply.send({ outreach: res.rows[0] });
+    const [events, messages] = await Promise.all([
+      pool.query(`SELECT * FROM outreach_events WHERE outreach_id = $1 ORDER BY created_at DESC LIMIT 20`, [id]),
+      pool.query(`SELECT * FROM outreach_messages WHERE outreach_id = $1 ORDER BY id DESC`, [id]),
+    ]);
+    reply.send({ outreach: res.rows[0], events: events.rows, messages: messages.rows });
   });
 
   app.post('/api/proposals/:id/outreach', async (req, reply) => {
@@ -65,8 +78,8 @@ export function registerOutreachRoutes(app: FastifyInstance) {
     const res = await pool.query(
       `INSERT INTO outreach
          (company_id, proposal_id, subject, body, target_company,
-          recommended_service, reason, status)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft')
+          recommended_service, reason, status, approval_status)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, 'draft', 'pending')
        RETURNING *`,
       [
         p.company_id,
@@ -88,11 +101,13 @@ export function registerOutreachRoutes(app: FastifyInstance) {
       `UPDATE outreach SET
          subject = COALESCE($2, subject),
          body = COALESCE($3, body),
+         edited_before_send = CASE WHEN $2 IS NOT NULL OR $3 IS NOT NULL THEN true ELSE edited_before_send END,
          updated_at = now()
        WHERE id = $1 RETURNING *`,
       [id, body.subject != null ? String(body.subject) : null, body.body != null ? String(body.body) : null]
     );
     if (res.rowCount === 0) return reply.code(404).send({ error: 'Outreach not found' });
+    await logActivity({ actor: body.actor || 'dashboard', action: 'outreach_edited', entityType: 'outreach', entityId: id });
     reply.send({ outreach: res.rows[0] });
   });
 
@@ -102,25 +117,75 @@ export function registerOutreachRoutes(app: FastifyInstance) {
     if (body.confirm !== true) {
       return reply.code(400).send({ error: 'Explicit confirmation is required to approve and send' });
     }
+    const approvedBy = String(body.approved_by || '').trim() || 'dashboard-user';
+    const current = await pool.query(`SELECT * FROM outreach WHERE id = $1`, [id]);
+    if (current.rowCount === 0) return reply.code(404).send({ error: 'Outreach not found' });
+    const o = current.rows[0];
+    if (o.status !== 'draft') {
+      return reply.code(409).send({ error: `Outreach already ${o.status}, cannot approve` });
+    }
+
     const res = await pool.query(
-      `UPDATE outreach SET status = 'approved', sent_at = now(), updated_at = now()
+      `UPDATE outreach SET
+         status = 'approved',
+         approval_status = 'approved',
+         approved_by = $2,
+         approved_at = now(),
+         edited_before_send = COALESCE(edited_before_send, false)
        WHERE id = $1 RETURNING *`,
+      [id, approvedBy]
+    );
+    const approved = res.rows[0];
+
+    // Queue the delivery message for n8n to pick up
+    const msgRes = await pool.query(
+      `INSERT INTO outreach_messages (outreach_id, provider, status, attempts)
+       VALUES ($1, 'n8n', 'queued', 0) RETURNING *`,
       [id]
     );
-    if (res.rowCount === 0) return reply.code(404).send({ error: 'Outreach not found' });
-    const o = res.rows[0];
-    await pool.query(`UPDATE proposals SET status = 'sent', updated_at = now() WHERE id = $1`, [o.proposal_id]);
-    await pool.query(`UPDATE companies SET status = 'outreach', updated_at = now() WHERE id = $1`, [o.company_id]);
-    reply.send({ outreach: o, note: 'Approved. MVP does not send real email; status marked sent for tracking.' });
+    await pool.query(
+      `INSERT INTO outreach_events (outreach_id, message_id, event, detail) VALUES ($1, $2, 'queued', $3)`,
+      [id, msgRes.rows[0].id, JSON.stringify({ note: 'Queued for n8n delivery' })]
+    );
+
+    await pool.query(`UPDATE proposals SET status = 'approved', updated_at = now() WHERE id = $1`, [o.proposal_id]);
+    await pool.query(`UPDATE companies SET status = 'approved', stage = 'Approved', updated_at = now() WHERE id = $1`, [o.company_id]);
+    await logActivity({
+      actor: approvedBy,
+      action: 'outreach_approved',
+      entityType: 'outreach',
+      entityId: id,
+      detail: { edited_before_send: approved.edited_before_send, proposal_id: o.proposal_id },
+    });
+
+    reply.send({
+      outreach: approved,
+      message: msgRes.rows[0],
+      note: 'Approved and queued. n8n will pick up the message and send it, then record the delivery status.',
+    });
   });
 
   app.post('/api/outreach/:id/reject', async (req, reply) => {
     const id = Number((req.params as any).id);
+    const body: any = req.body || {};
+    const reason = String(body.reason || '').trim();
     const res = await pool.query(
-      `UPDATE outreach SET status = 'rejected', updated_at = now() WHERE id = $1 RETURNING *`,
-      [id]
+      `UPDATE outreach SET
+         status = 'rejected',
+         approval_status = 'rejected',
+         rejected_reason = $2,
+         updated_at = now()
+       WHERE id = $1 RETURNING *`,
+      [id, reason || null]
     );
     if (res.rowCount === 0) return reply.code(404).send({ error: 'Outreach not found' });
+    await logActivity({
+      actor: body.actor || 'dashboard-user',
+      action: 'outreach_rejected',
+      entityType: 'outreach',
+      entityId: id,
+      detail: { reason },
+    });
     reply.send({ outreach: res.rows[0] });
   });
 }

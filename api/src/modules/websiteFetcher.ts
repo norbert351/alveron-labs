@@ -1,5 +1,6 @@
 import * as cheerio from 'cheerio';
 import { config } from '../config.ts';
+import { assertSafeUrl, isBlockedIp } from '../ssrf.ts';
 import type { SiteSnapshot } from '../types.ts';
 
 function normalizeUrl(raw: string): string {
@@ -8,25 +9,43 @@ function normalizeUrl(raw: string): string {
   return url;
 }
 
-async function fetchWithTimeout(url: string): Promise<{ html: string; finalUrl: string }> {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), config.fetcher.timeoutMs);
-  try {
-    const res = await fetch(url, {
-      headers: {
-        'User-Agent': config.fetcher.userAgent,
-        Accept: 'text/html,application/xhtml+xml',
-        'Accept-Language': 'en-US,en;q=0.9',
-      },
-      redirect: 'follow',
-      signal: controller.signal,
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status} for ${url}`);
+/**
+ * Fetch with SSRF protection: every hop (including redirects) is DNS-checked
+ * and must resolve to a public address only.
+ */
+async function fetchWithTimeout(rawUrl: string): Promise<{ html: string; finalUrl: string }> {
+  let current = normalizeUrl(rawUrl);
+  for (let hop = 0; hop < 6; hop++) {
+    const safe = await assertSafeUrl(current);
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), config.fetcher.timeoutMs);
+    let res: Response;
+    try {
+      res = await fetch(safe.href, {
+        headers: {
+          'User-Agent': config.fetcher.userAgent,
+          Accept: 'text/html,application/xhtml+xml',
+          'Accept-Language': 'en-US,en;q=0.9',
+        },
+        redirect: 'manual',
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+    const status = res.status;
+    if (status >= 300 && status < 400) {
+      const loc = res.headers.get('location');
+      if (!loc) throw new Error(`Redirect without location for ${current}`);
+      current = new URL(loc, safe).href;
+      await res.body?.cancel();
+      continue;
+    }
+    if (!res.ok) throw new Error(`HTTP ${status} for ${current}`);
     const html = await res.text();
-    return { html, finalUrl: res.url || url };
-  } finally {
-    clearTimeout(timer);
+    return { html, finalUrl: current };
   }
+  throw new Error('Too many redirects');
 }
 
 const INTERESTING_PATHS = [
@@ -156,3 +175,5 @@ export async function fetchSite(rawUrl: string): Promise<SiteSnapshot> {
     pageCount: pages.length,
   };
 }
+
+export { isBlockedIp };

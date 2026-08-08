@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, Globe, Loader2, RefreshCw, FileText, Send, Sparkles } from 'lucide-react';
-import { api, type CompanyDetail } from '@/lib/api';
-import { StatusPill, ServiceBadge, ConfidenceBar, Spinner, EmptyState, timeAgo } from '@/components/ui';
+import { ArrowLeft, Globe, Loader2, RefreshCw, FileText, Send, Sparkles, History } from 'lucide-react';
+import clsx from 'clsx';
+import { api, type CompanyDetail, PIPELINE_STAGES } from '@/lib/api';
+import { StatusPill, ServiceBadge, ConfidenceBar, EmptyState, timeAgo } from '@/components/ui';
 import { JobStepper } from '@/components/JobStepper';
+import { ScoreBadge } from '@/components/ScoreBadge';
 
 export default function CompanyDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -14,6 +16,7 @@ export default function CompanyDetailPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState('');
+  const [stageNote, setStageNote] = useState('');
 
   const load = useCallback(() => {
     api
@@ -41,6 +44,11 @@ export default function CompanyDetailPage() {
     }
   }
 
+  async function changeStage(stage: string) {
+    await act('stage', () => api.patch(`/api/companies/${data!.company.id}/stage`, { stage, note: stageNote || undefined }));
+    setStageNote('');
+  }
+
   if (error && !data) {
     return (
       <div className="mx-auto max-w-6xl">
@@ -58,8 +66,9 @@ export default function CompanyDetailPage() {
     );
   }
 
-  const { company, scan, report, opportunities, proposals, outreach, job } = data;
+  const { company, scan, report, opportunities, proposals, outreach, job, activity } = data;
   const jobActive = job && (job.status === 'pending' || job.status === 'running');
+  const stageIndex = PIPELINE_STAGES.indexOf(company.stage as any);
 
   return (
     <div className="mx-auto max-w-6xl animate-fade-up">
@@ -78,6 +87,9 @@ export default function CompanyDetailPage() {
               <Globe size={13} /> {company.website.replace(/^https?:\/\//, '')}
             </a>
             {company.industry && <span className="text-ink-muted">{company.industry}</span>}
+            {company.lead_source && (
+              <span className="badge border-violet/30 bg-violet/10 text-violet-bright">lead: {company.lead_source}</span>
+            )}
           </div>
           {company.notes && <p className="mt-2 max-w-2xl text-sm text-ink-muted">{company.notes}</p>}
         </div>
@@ -95,6 +107,40 @@ export default function CompanyDetailPage() {
       {msg && (
         <div className="mb-4 rounded-lg border border-red-500/25 bg-red-500/5 p-3 text-xs text-red-300">{msg}</div>
       )}
+
+      {/* CRM pipeline */}
+      <div className="card mb-6 p-5 animate-fade-in">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="section-title">CRM pipeline</div>
+          <div className="flex items-center gap-2">
+            <input
+              className="input w-56"
+              placeholder="Note for this stage change (optional)"
+              value={stageNote}
+              onChange={(e) => setStageNote(e.target.value)}
+            />
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {PIPELINE_STAGES.map((s, i) => (
+            <button
+              key={s}
+              onClick={() => changeStage(s)}
+              disabled={!!busy}
+              className={clsx(
+                'rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-all',
+                s === company.stage
+                  ? 'border-electric/60 bg-alveron-gradient/20 text-electric-bright shadow-[0_0_16px_rgba(61,126,255,0.15)]'
+                  : i < stageIndex
+                    ? 'border-obsidian-border bg-obsidian-raised text-ink-soft hover:border-electric/30'
+                    : 'border-obsidian-border text-ink-muted hover:border-electric/30 hover:text-ink-soft'
+              )}
+            >
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div className="space-y-6 lg:col-span-2">
@@ -119,6 +165,7 @@ export default function CompanyDetailPage() {
               {opportunities.map((o) => (
                 <div key={o.id} className="card card-hover p-5 animate-fade-in">
                   <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <ScoreBadge score={o.score} />
                     <ServiceBadge service={o.matched_service} />
                     <StatusPill status={o.status} />
                     <span className="ml-auto">
@@ -142,14 +189,23 @@ export default function CompanyDetailPage() {
                       {o.recommended_solution}
                     </div>
                   )}
+                  {o.score && (
+                    <div className="mt-3 flex flex-wrap gap-3 rounded-lg bg-obsidian-raised/60 p-3 text-[11px] text-ink-soft">
+                      <span>Evidence <b className="font-mono text-ink">{o.score_evidence_quality}</b></span>
+                      <span>Severity <b className="font-mono text-ink">{o.score_problem_severity}</b></span>
+                      <span>Fit <b className="font-mono text-ink">{o.score_alveron_fit}</b></span>
+                      <span>Value <b className="font-mono text-ink">{o.score_operational_value}</b></span>
+                      <span>Feasibility <b className="font-mono text-ink">{o.score_feasibility}</b></span>
+                      <span>Complexity <b className="font-mono text-ink">{o.score_complexity}/5</b></span>
+                      {o.score_rationale && <span className="w-full text-ink-muted">{o.score_rationale}</span>}
+                    </div>
+                  )}
                   {o.status === 'open' && (
                     <div className="mt-3 flex gap-2">
                       <button
                         className="btn-primary"
                         disabled={!!busy}
-                        onClick={() =>
-                          act('proposal', () => api.post(`/api/opportunities/${o.id}/proposal`))
-                        }
+                        onClick={() => act('proposal', () => api.post(`/api/opportunities/${o.id}/proposal`))}
                       >
                         {busy === 'proposal' ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
                         Generate proposal
@@ -188,7 +244,7 @@ export default function CompanyDetailPage() {
                       <StatusPill status={p.status} />
                     </div>
                     <p className="line-clamp-2 text-xs leading-relaxed text-ink-muted">{p.opening}</p>
-                    {p.status !== 'sent' && (
+                    {p.status === 'draft' && (
                       <button
                         className="mt-2 inline-flex items-center gap-1 text-xs text-electric-bright hover:text-electric"
                         disabled={!!busy}
@@ -215,7 +271,9 @@ export default function CompanyDetailPage() {
                       <StatusPill status={o.status} />
                     </div>
                     <div className="mt-1 text-[11px] text-ink-muted">
-                      {o.sent_at ? `Sent ${timeAgo(o.sent_at)}` : `Drafted ${timeAgo(o.created_at)}`}
+                      {o.status === 'sent' && o.sent_at ? `Sent ${timeAgo(o.sent_at)}` : `Drafted ${timeAgo(o.created_at)}`}
+                      {o.approved_by && ` · approved by ${o.approved_by}`}
+                      {o.latest_message && ` · ${o.latest_message.status}`}
                     </div>
                   </div>
                 ))}
@@ -223,9 +281,33 @@ export default function CompanyDetailPage() {
             </div>
           )}
 
-          {opportunities.length === 0 && !jobActive && (
-            <EmptyState title="No opportunities yet" hint="Run an analysis to detect opportunities" />
-          )}
+          <div className="card p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <History size={15} className="text-ink-muted" />
+              <div className="section-title">Activity history</div>
+            </div>
+            {activity && activity.length > 0 ? (
+              <div className="max-h-80 space-y-2 overflow-y-auto">
+                {activity.map((a) => (
+                  <div key={a.id} className="rounded-lg bg-obsidian-raised/50 p-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-medium text-ink-soft">{a.action.replace(/_/g, ' ')}</span>
+                      <span className="shrink-0 text-[10px] text-ink-muted">{timeAgo(a.created_at)}</span>
+                    </div>
+                    {a.action === 'stage_changed' && a.detail && (
+                      <div className="mt-0.5 text-[11px] text-ink-muted">
+                        {a.detail.from} → {a.detail.to}
+                        {a.detail.note ? ` · ${a.detail.note}` : ''}
+                      </div>
+                    )}
+                    <div className="text-[10px] text-ink-muted">{a.actor}</div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-ink-muted">No activity yet</div>
+            )}
+          </div>
         </div>
       </div>
     </div>

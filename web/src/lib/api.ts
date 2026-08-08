@@ -42,6 +42,19 @@ export interface Job {
   error: string | null;
 }
 
+export const PIPELINE_STAGES = [
+  'Discovered',
+  'Researching',
+  'Qualified',
+  'Proposal Ready',
+  'Approved',
+  'Contacted',
+  'Replied',
+  'Meeting',
+  'Won',
+  'Lost',
+] as const;
+
 export interface Company {
   id: number;
   name: string;
@@ -53,6 +66,8 @@ export interface Company {
   main_offering: string | null;
   technologies: string[];
   status: string;
+  stage: string;
+  lead_source: string | null;
   created_at: string;
   opportunity_count?: number;
 }
@@ -86,6 +101,15 @@ export interface Opportunity {
   matched_service: string | null;
   status: string;
   company_name?: string;
+  score: number | null;
+  priority: string | null;
+  score_evidence_quality?: number | string;
+  score_problem_severity?: number | string;
+  score_alveron_fit?: number | string;
+  score_operational_value?: number | string;
+  score_feasibility?: number | string;
+  score_complexity?: number | string;
+  score_rationale?: string | null;
   created_at: string;
 }
 
@@ -104,6 +128,18 @@ export interface Proposal {
   created_at: string;
 }
 
+export interface OutreachMessage {
+  id: number;
+  outreach_id: number;
+  provider: string | null;
+  provider_message_id: string | null;
+  status: string;
+  attempts: number;
+  last_error: string | null;
+  sent_at: string | null;
+  delivered_at: string | null;
+}
+
 export interface OutreachItem {
   id: number;
   company_id: number;
@@ -114,7 +150,23 @@ export interface OutreachItem {
   recommended_service: string;
   reason: string;
   status: string;
+  approval_status: string | null;
+  approved_by: string | null;
+  approved_at: string | null;
+  edited_before_send: boolean;
+  rejected_reason: string | null;
   sent_at: string | null;
+  created_at: string;
+  latest_message?: OutreachMessage | null;
+}
+
+export interface ActivityItem {
+  id: number;
+  actor: string;
+  action: string;
+  entity_type: string;
+  entity_id: number;
+  detail: any;
   created_at: string;
 }
 
@@ -126,14 +178,53 @@ export interface CompanyDetail {
   proposals: Proposal[];
   outreach: OutreachItem[];
   job: Job | null;
+  activity: ActivityItem[];
+}
+
+export interface WorkflowRun {
+  id: number;
+  workflow_name: string;
+  n8n_run_id: string | null;
+  status: string;
+  trigger: string | null;
+  retry_count: number;
+  last_error: string | null;
+  started_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+}
+
+export interface Lead {
+  id: number;
+  source: string;
+  source_key: string;
+  company_id: number | null;
+  name: string;
+  website: string | null;
+  industry: string | null;
+  location: string | null;
+  company_size: string | null;
+  keywords: string[];
+  status: string;
+  created_at: string;
 }
 
 export interface Overview {
   companies: { total: number; new: number; analyzed: number; proposed: number; outreach: number };
   scans: { total: number; completed: number; failed: number };
-  opportunities: { total: number; avg_confidence: string | null; open: number };
-  proposals: { total: number; sent: number; draft: number };
-  outreach: { total: number; approved: number; sent: number; rejected: number };
+  opportunities: { total: number; avg_confidence: string | null; open: number; high: number; medium: number; low: number };
+  proposals: { total: number; sent: number; draft: number; approved: number };
+  outreach: { total: number; approved: number; sent: number; rejected: number; failed: number; bounced: number };
   recentCompanies: Company[];
   byService: { matched_service: string; count: number }[];
+  byPriority: { priority: string; count: number }[];
+  stages: { stage: string; count: number }[];
+  conversionRates: Record<string, number | null>;
+}
+
+export interface SettingsData {
+  llm: { baseUrl: string; model: string; keySet: boolean };
+  services: { name: string; description: string }[];
+  followUp: { enabled: boolean; days: number[]; max_follow_ups: number };
+  email: { provider: string; from_name: string; from_email: string };
 }

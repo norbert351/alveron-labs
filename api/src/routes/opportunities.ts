@@ -3,7 +3,7 @@ import { pool } from '../db.ts';
 
 export function registerOpportunityRoutes(app: FastifyInstance) {
   app.get('/api/opportunities', async (req, reply) => {
-    const { company_id, status, service } = req.query as any;
+    const { company_id, status, service, priority } = req.query as any;
     const conds: string[] = [];
     const params: any[] = [];
     if (company_id) {
@@ -18,11 +18,15 @@ export function registerOpportunityRoutes(app: FastifyInstance) {
       params.push(service);
       conds.push(`o.matched_service = $${params.length}`);
     }
+    if (priority) {
+      params.push(priority);
+      conds.push(`o.priority = $${params.length}`);
+    }
     const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
     const res = await pool.query(
       `SELECT o.*, c.name AS company_name, c.website AS company_website
        FROM opportunities o JOIN companies c ON c.id = o.company_id
-       ${where} ORDER BY o.confidence DESC, o.created_at DESC`,
+       ${where} ORDER BY o.score DESC NULLS LAST, o.confidence DESC, o.created_at DESC`,
       params
     );
     reply.send({ opportunities: res.rows });

@@ -83,7 +83,14 @@ export function registerProposalRoutes(app: FastifyInstance) {
       ]
     );
     await pool.query(`UPDATE opportunities SET status = 'proposed' WHERE id = $1`, [oppId]);
-    await pool.query(`UPDATE companies SET status = 'proposed', updated_at = now() WHERE id = $1`, [opp.company_id]);
+    await pool.query(
+      `UPDATE companies SET status = 'proposed', stage = 'Proposal Ready', updated_at = now() WHERE id = $1`,
+      [opp.company_id]
+    );
+    await pool.query(
+      `INSERT INTO activity_logs (actor, action, entity_type, entity_id, detail) VALUES ('system', 'stage_changed', 'company', $1, $2)`,
+      [opp.company_id, JSON.stringify({ from: 'Qualified', to: 'Proposal Ready', note: 'Proposal generated' })]
+    ).catch(() => {});
     reply.code(201).send({ proposal: res.rows[0] });
   });
 

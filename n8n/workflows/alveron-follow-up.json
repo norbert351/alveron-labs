@@ -1,0 +1,92 @@
+{
+  "name": "Alveron Follow-up Sequence",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "days", "daysInterval": 1 },
+            { "field": "hour", "hourInterval": 1 }
+          ]
+        }
+      },
+      "id": "f1",
+      "name": "Daily check",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:3100/api/webhook/follow-up-due",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f2",
+      "name": "Get Due Follow-ups",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "items"
+      },
+      "id": "f3",
+      "name": "Split Out Items",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [440, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EMAIL_PROVIDER_URL || 'http://127.0.0.1:3199/send' }}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ to: $json.target_company, subject: 'Follow-up: ' + $json.subject, html: $json.body, from: ($env.EMAIL_FROM || 'outreach@alveronlabs.dev') }) }}",
+        "options": {}
+      },
+      "id": "f4",
+      "name": "Send Follow-up",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=http://127.0.0.1:3100/api/webhook/outreach/{{ $json.outreach_id }}/message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'sent', provider: $json.provider || 'email-provider', provider_message_id: $json.id || null, attempts: $json.attempts || 0 }) }}",
+        "options": {}
+      },
+      "id": "f5",
+      "name": "Advance Sequence",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 0]
+    }
+  ],
+  "connections": {
+    "Daily check": { "main": [[{ "node": "Get Due Follow-ups", "type": "main", "index": 0 }]] },
+    "Get Due Follow-ups": { "main": [[{ "node": "Split Out Items", "type": "main", "index": 0 }]] },
+    "Split Out Items": { "main": [[{ "node": "Send Follow-up", "type": "main", "index": 0 }]] },
+    "Send Follow-up": { "main": [[{ "node": "Advance Sequence", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "active": false
+}

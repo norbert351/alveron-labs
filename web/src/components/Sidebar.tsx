@@ -10,6 +10,8 @@ import {
   Lightbulb,
   FileText,
   Send,
+  BarChart3,
+  Workflow,
   Settings,
 } from 'lucide-react';
 import { Logo } from './Logo';
@@ -21,6 +23,8 @@ const NAV = [
   { href: '/opportunities', label: 'Opportunities', icon: Lightbulb },
   { href: '/proposals', label: 'Proposals', icon: FileText },
   { href: '/outreach', label: 'Outreach', icon: Send },
+  { href: '/analytics', label: 'Analytics', icon: BarChart3 },
+  { href: '/workflows', label: 'Workflows', icon: Workflow },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 

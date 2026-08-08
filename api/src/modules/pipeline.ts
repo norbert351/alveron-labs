@@ -5,6 +5,7 @@ import { researchCompany } from './CompanyResearch.ts';
 import { analyzeWebsite } from './WebsiteAnalysis.ts';
 import { matchServices, getServiceCatalog } from './OpportunityDetection.ts';
 import { recommendSolution } from './SolutionRecommendation.ts';
+import { scoreOpportunity, priorityFromScore } from './LeadScoring.ts';
 
 const STEP_DEFS: { key: string; label: string }[] = [
   { key: 'fetch', label: 'Website fetch' },
@@ -23,6 +24,15 @@ export async function createJobForCompany(companyId: number): Promise<JobRow> {
     [companyId, JSON.stringify(steps)]
   );
   return rowToJob(res.rows[0]);
+}
+
+/** Returns the active job for a company (pending or running), if any. */
+export async function getActiveJob(companyId: number): Promise<JobRow | null> {
+  const res = await pool.query(
+    `SELECT * FROM jobs WHERE company_id = $1 AND status IN ('pending', 'running') ORDER BY id DESC LIMIT 1`,
+    [companyId]
+  );
+  return res.rowCount ? rowToJob(res.rows[0]) : null;
 }
 
 async function updateJobStep(jobId: number, key: string, status: JobStep['status'], detail?: string) {
@@ -71,6 +81,13 @@ export async function runCompanyPipeline(jobId: number): Promise<void> {
   const job = await getJob(jobId);
   if (!job) return;
   const companyId = job.company_id;
+
+  await pool.query(`UPDATE companies SET stage = 'Researching', updated_at = now() WHERE id = $1`, [companyId]);
+  await pool.query(
+    `INSERT INTO activity_logs (actor, action, entity_type, entity_id, detail)
+     VALUES ('system', 'stage_changed', 'company', $1, $2)`,
+    [companyId, JSON.stringify({ from: 'Discovered', to: 'Researching' })]
+  ).catch(() => {});
 
   const scan = await pool.query(
     `INSERT INTO website_scans (company_id, url, status)
@@ -138,7 +155,7 @@ export async function runCompanyPipeline(jobId: number): Promise<void> {
     );
     await updateJobStep(jobId, 'analyze', 'completed', `${findings.length} findings`);
 
-    // Step 4: match services + recommend solutions
+    // Step 4: match services + recommend solutions + score
     await updateJobStep(jobId, 'match', 'running');
     const services = await getServiceCatalog();
     const matches = await matchServices(findings, services);
@@ -164,11 +181,12 @@ export async function runCompanyPipeline(jobId: number): Promise<void> {
       } catch {
         /* keep analysis-level solution on recommendation failure */
       }
-      await pool.query(
+      const oppRes = await pool.query(
         `INSERT INTO opportunities
            (company_id, scan_id, problem, evidence, confidence, business_impact,
             recommended_solution, matched_service, status)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'open')`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'open')
+         RETURNING id`,
         [
           companyId,
           scanId,
@@ -180,15 +198,71 @@ export async function runCompanyPipeline(jobId: number): Promise<void> {
           match.matched_service,
         ]
       );
+      const opportunityId = oppRes.rows[0].id;
+      try {
+        const score = await scoreOpportunity({
+          companyName: (await pool.query(`SELECT name FROM companies WHERE id = $1`, [companyId])).rows[0].name,
+          industry: research.industry,
+          service: match.matched_service,
+          problem: f.problem,
+          evidence: f.evidence,
+          business_impact: f.business_impact,
+          solution,
+        });
+        await pool.query(
+          `UPDATE opportunities SET
+             score = $2, score_evidence_quality = $3, score_problem_severity = $4,
+             score_alveron_fit = $5, score_operational_value = $6, score_feasibility = $7,
+             score_complexity = $8, score_rationale = $9, priority = $10
+           WHERE id = $1`,
+          [
+            opportunityId,
+            score.score,
+            score.evidence_quality,
+            score.problem_severity,
+            score.alveron_fit,
+            score.operational_value,
+            score.feasibility,
+            score.complexity,
+            score.rationale,
+            priorityFromScore(score.score),
+          ]
+        );
+        await pool.query(
+          `INSERT INTO lead_scores
+             (opportunity_id, score, evidence_quality, problem_severity, alveron_fit,
+              confidence, operational_value, feasibility, complexity, rationale)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            opportunityId,
+            score.score,
+            score.evidence_quality,
+            score.problem_severity,
+            score.alveron_fit,
+            score.confidence,
+            score.operational_value,
+            score.feasibility,
+            score.complexity,
+            score.rationale,
+          ]
+        );
+      } catch {
+        /* scoring is best-effort, opportunity still stands without it */
+      }
     }
     await updateJobStep(jobId, 'match', 'completed', `${findings.length} opportunities`);
 
     // Step 5: finalize
     await updateJobStep(jobId, 'finalize', 'running');
     await pool.query(
-      `UPDATE companies SET status = 'analyzed', updated_at = now() WHERE id = $1`,
+      `UPDATE companies SET status = 'analyzed', stage = 'Qualified', updated_at = now() WHERE id = $1`,
       [companyId]
     );
+    await pool.query(
+      `INSERT INTO activity_logs (actor, action, entity_type, entity_id, detail)
+       VALUES ('system', 'stage_changed', 'company', $1, $2)`,
+      [companyId, JSON.stringify({ from: 'Researching', to: 'Qualified', note: 'Analysis completed' })]
+    ).catch(() => {});
     await updateJobStep(jobId, 'finalize', 'completed');
   } catch (err: any) {
     const msg = err?.message || String(err);
