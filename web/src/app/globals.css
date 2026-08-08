@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  background: #0a0d13;
+  color: #e8ecf4;
+  font-family: var(--font-body), sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(61, 126, 255, 0.35);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #1f2735 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #1f2735;
+  border-radius: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@layer components {
+  .card {
+    @apply rounded-xl border border-obsidian-border bg-obsidian-card/80 backdrop-blur-sm;
+  }
+
+  .card-hover {
+    @apply transition-all duration-300 hover:border-electric/40 hover:shadow-[0_0_24px_rgba(61,126,255,0.08)];
+  }
+
+  .input {
+    @apply w-full rounded-lg border border-obsidian-border bg-obsidian-raised px-3 py-2 text-sm text-ink placeholder:text-ink-muted
+      outline-none transition-colors focus:border-electric/60 focus:ring-1 focus:ring-electric/30;
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition-all
+      duration-200 disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-alveron-gradient text-white shadow-[0_4px_20px_rgba(61,126,255,0.25)]
+      hover:shadow-[0_6px_28px_rgba(139,92,246,0.35)] hover:brightness-110 active:scale-[0.98];
+  }
+
+  .btn-ghost {
+    @apply btn border border-obsidian-border bg-transparent text-ink-soft hover:border-electric/40 hover:text-ink;
+  }
+
+  .btn-danger {
+    @apply btn border border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20;
+  }
+
+  .btn-success {
+    @apply btn border border-emerald-500/30 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wider text-ink-muted;
+  }
+
+  .section-title {
+    @apply font-display text-lg font-semibold text-ink;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] font-medium;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #131926 25%, #1a2233 50%, #131926 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.8s linear infinite;
+}
