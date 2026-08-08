@@ -18,17 +18,18 @@ auto-sending. Every email requires explicit human approval.
 ## Workflow
 
 ```
-Company URL → Website fetch → Company Research → Opportunity Analysis
-→ Service Matching → Lead Scoring → Proposal → Outreach draft
-→ Human Approval → n8n queue → Transactional provider → Delivery tracking
-→ Follow-up sequence (stops on reply/reject/customer/pause)
+Company URL → Website fetch (+headless SPA fallback) → Company Research
+→ Opportunity Analysis → Service Matching → Lead Scoring (80/60/40 calibrated)
+→ Proposal → Outreach draft → Human Approval (attributed) → queue
+→ n8n → real provider send (Gmail/Graph/Resend OAuth) → delivery tracking
+→ reply detection → follow-up sequence (stops on reply/reject/pause)
 ```
 
 ## Quick start
 
 ```bash
 # API (from api/)
-cp .env.example .env        # set ALVERON_DATABASE_URL, LLM, tokens
+cp .env.example .env        # set ALVERON_DATABASE_URL, LLM, tokens, ENCRYPTION_KEY
 npm install
 npx tsx src/index.ts        # :3100
 
@@ -37,7 +38,10 @@ cp .env.local.example .env.local   # set ALVERON_INTERNAL_TOKEN to match
 npm install
 npm run dev                 # :3101
 
-# n8n (see docs/N8N.md)
+# First run: POST /api/auth/setup (or the dashboard's First-run setup tab) creates the owner
+
+# Real email: see docs/OAUTH.md — Gmail/Graph/Resend credentials required
+# n8n: see docs/N8N.md
 ```
 
 ## Environment variables
