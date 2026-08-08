@@ -236,8 +236,9 @@ export function registerWebhookRoutes(app: FastifyInstance) {
       await pool.query(`UPDATE companies SET status = 'outreach', stage = 'Contacted', updated_at = now() WHERE id = $1`,
         [(await pool.query(`SELECT company_id FROM outreach WHERE id = $1`, [outreachId])).rows[0].company_id]);
       await logActivity({ actor: 'n8n', action: 'email_sent', entityType: 'outreach', entityId: outreachId });
-      await startFollowUpSequence(outreachId);
-      await advanceFollowUp(outreachId);
+      const fresh = await startFollowUpSequence(outreachId);
+      // Only advance the sequence on FOLLOW-UP sends; the initial send created it
+      if (!fresh) await advanceFollowUp(outreachId);
     }
     if (status === 'delivered') {
       await logActivity({ actor: 'email-provider', action: 'email_delivered', entityType: 'outreach', entityId: outreachId });
@@ -427,15 +428,21 @@ async function recordEmailStatus(reply: any, outreachId: number, body: any) {
   reply.send({ ok: true, status });
 }
 
-async function startFollowUpSequence(outreachId: number) {
+async function startFollowUpSequence(outreachId: number): Promise<boolean> {
+  const existing = await pool.query(
+    `SELECT id FROM follow_up_sequences WHERE outreach_id = $1 LIMIT 1`,
+    [outreachId]
+  );
+  if ((existing.rowCount ?? 0) > 0) return false; // already created on the initial send
   const cfg = (await getSetting('follow_up')) || { enabled: true, days: [0, 4, 9], max_follow_ups: 2 };
   const days: number[] = Array.isArray(cfg.days) ? cfg.days.filter((d: any) => Number.isFinite(Number(d))).map(Number) : [0, 4, 9];
   const steps = days.map((d, i) => ({ step: i, day: d, status: i === 0 ? 'sent' : 'pending' }));
   await pool.query(
     `INSERT INTO follow_up_sequences (outreach_id, status, current_step, steps)
      VALUES ($1, $2, $3, $4)`,
-    [outreachId, cfg.enabled === false ? 'paused' : 'running', 0, JSON.stringify(steps)]
+    [outreachId, cfg.enabled === false ? 'paused' : 'running', 1, JSON.stringify(steps)]
   );
+  return true;
 }
 
 async function advanceFollowUp(outreachId: number) {

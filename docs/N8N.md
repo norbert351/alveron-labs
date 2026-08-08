@@ -11,12 +11,25 @@ mkdir ~/n8n && cd ~/n8n
 npm init -y
 npm install n8n@2.33.7 --no-audit --no-fund
 export N8N_PORT=5678 N8N_HOST=127.0.0.1
-export N8N_API_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(32))')"
+export N8N_BLOCK_ENV_ACCESS_IN_NODE=false   # required: workflows read $env.ALVERON_WEBHOOK_TOKEN
 export ALVERON_WEBHOOK_TOKEN="$(grep -oP '^ALVERON_WEBHOOK_TOKEN=\K.*' ../alveron-labs/api/.env)"
 node node_modules/n8n/bin/n8n start
 ```
 
-Import a workflow:
+First boot creates the owner account (headless):
+
+```bash
+curl -X POST http://127.0.0.1:5678/rest/owner/setup -H "Content-Type: application/json" \
+  -d '{"email":"owner@example.com","firstName":"Owner","lastName":"Name","password":"..."}' -c /tmp/n8n_cookies.txt
+curl -X POST http://127.0.0.1:5678/rest/login -H "Content-Type: application/json" \
+  -d '{"emailOrLdapLoginId":"owner@example.com","password":"..."}' -c /tmp/n8n_cookies.txt
+# API key for the public API (scopes must match n8n's exact names: workflow:create/update, NOT workflow:write)
+curl -X POST http://127.0.0.1:5678/rest/api-keys -b /tmp/n8n_cookies.txt -H "Content-Type: application/json" \
+  -d "{\"label\":\"alveron\",\"expiresAt\":$(python3 -c 'import time; print(int(time.time()*1000)+31536000000)'),\"scopes\":[\"workflow:create\",\"workflow:update\",\"workflow:read\",\"workflow:list\",\"workflow:delete\",\"execution:list\",\"execution:read\"]}"
+# the full key is in rawApiKey of the response
+```
+
+Import a workflow (`n8n/import_workflows.sh` does all four):
 
 ```bash
 curl -X POST http://127.0.0.1:5678/api/v1/workflows \
@@ -24,8 +37,13 @@ curl -X POST http://127.0.0.1:5678/api/v1/workflows \
   -d @n8n/workflows/alveron-company-analysis.json
 ```
 
-Activate from the n8n editor or: `PATCH /api/v1/workflows/{id}` with
-`{"active": true}`.
+The public API treats `active` as read-only. Activate via the editor API with
+the session cookie (see `n8n/reimport_workflow.sh`):
+
+```bash
+curl -X POST http://127.0.0.1:5678/rest/workflows/{id}/activate -b /tmp/n8n_cookies.txt \
+  -H "Content-Type: application/json" -d "{\"versionId\":\"<versionId from GET /rest/workflows/{id}>\"}"
+```
 
 ## Workflow 1 — Company Analysis (`alveron-company-analysis.json`)
 

@@ -5,7 +5,10 @@
       "parameters": {
         "rule": {
           "interval": [
-            { "field": "minutes", "minutesInterval": 5 }
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
           ]
         }
       },
@@ -13,7 +16,10 @@
       "name": "Every 5 minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [0, 0]
+      "position": [
+        0,
+        0
+      ]
     },
     {
       "parameters": {
@@ -22,7 +28,10 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+            {
+              "name": "X-Webhook-Key",
+              "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}"
+            }
           ]
         },
         "options": {}
@@ -31,7 +40,10 @@
       "name": "Get Queue",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [220, 0]
+      "position": [
+        220,
+        0
+      ]
     },
     {
       "parameters": {
@@ -41,7 +53,10 @@
       "name": "Split Out Items",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [440, 0]
+      "position": [
+        440,
+        0
+      ]
     },
     {
       "parameters": {
@@ -56,16 +71,22 @@
       "name": "Send via Provider",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [660, 0]
+      "position": [
+        660,
+        0
+      ]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://127.0.0.1:3100/api/webhook/outreach/{{ $json.outreach_id }}/message",
+        "url": "=http://127.0.0.1:3100/api/webhook/outreach/{{ $('Split Out Items').item.json.outreach_id }}/message",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+            {
+              "name": "X-Webhook-Key",
+              "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}"
+            }
           ]
         },
         "sendBody": true,
@@ -77,15 +98,60 @@
       "name": "Record Sent",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [880, 0]
+      "position": [
+        880,
+        0
+      ]
     }
   ],
   "connections": {
-    "Every 5 minutes": { "main": [[{ "node": "Get Queue", "type": "main", "index": 0 }]] },
-    "Get Queue": { "main": [[{ "node": "Split Out Items", "type": "main", "index": 0 }]] },
-    "Split Out Items": { "main": [[{ "node": "Send via Provider", "type": "main", "index": 0 }]] },
-    "Send via Provider": { "main": [[{ "node": "Record Sent", "type": "main", "index": 0 }]] }
+    "Every 5 minutes": {
+      "main": [
+        [
+          {
+            "node": "Get Queue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Queue": {
+      "main": [
+        [
+          {
+            "node": "Split Out Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Out Items": {
+      "main": [
+        [
+          {
+            "node": "Send via Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send via Provider": {
+      "main": [
+        [
+          {
+            "node": "Record Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
   },
-  "settings": { "executionOrder": "v1" },
+  "settings": {
+    "executionOrder": "v1"
+  },
   "active": false
 }
