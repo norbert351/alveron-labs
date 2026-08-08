@@ -1,5 +1,7 @@
 import Fastify from 'fastify';
+import { randomUUID } from 'node:crypto';
 import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
 import { initDb, pool } from './db.ts';
 import { config } from './config.ts';
 import { registerSecurity } from './plugins/security.ts';
@@ -32,12 +34,43 @@ async function main() {
   );
   console.log('[alveron-api] database ready');
 
-  const app = Fastify({ logger: false, bodyLimit: 4 * 1024 * 1024 });
+  const app = Fastify({
+    logger: {
+      level: process.env.LOG_LEVEL || 'info',
+      serializers: {
+        req: (req: any) => ({
+          method: req.method,
+          url: req.url,
+          request_id: req.id,
+          ip: req.ip,
+          user: (req.user as any)?.email || undefined,
+        }),
+        res: (res: any) => ({ statusCode: res.statusCode }),
+      },
+    },
+    genReqId: () => crypto.randomUUID(),
+    bodyLimit: 4 * 1024 * 1024,
+  });
   // CSV import support
   app.addContentTypeParser('text/csv', { parseAs: 'string' }, (_req, body, done) => {
     done(null, body);
   });
   await app.register(cors, { origin: true });
+  await app.register(helmet, {
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:'],
+        connectSrc: ["'self'"],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com'],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
+    },
+    referrerPolicy: { policy: 'no-referrer' },
+  });
   await registerSecurity(app);
 
   app.get('/api/health', async () => ({ ok: true, service: 'alveron-labs-api' }));

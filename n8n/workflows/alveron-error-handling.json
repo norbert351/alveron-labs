@@ -1,0 +1,56 @@
+{
+  "name": "Alveron Error Handling",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alveron-error",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "h1",
+      "name": "Error Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:3100/api/webhook/workflow-run",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow_name: $json.body.workflow_name || 'unknown', status: 'failed', retry_count: $json.body.retry_count || 0, last_error: $json.body.last_error || '', trigger: 'error-webhook', payload: $json.body }) }}",
+        "options": {}
+      },
+      "id": "h2",
+      "name": "Record Failure",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, recorded: 'failed' }) }}",
+        "options": {}
+      },
+      "id": "h3",
+      "name": "Acknowledge",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [440, 0]
+    }
+  ],
+  "connections": {
+    "Error Webhook": { "main": [[{ "node": "Record Failure", "type": "main", "index": 0 }]] },
+    "Record Failure": { "main": [[{ "node": "Acknowledge", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}

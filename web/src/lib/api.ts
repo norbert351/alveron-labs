@@ -71,6 +71,13 @@ export interface Company {
   stage: string;
   lead_source: string | null;
   created_at: string;
+  industry: string | null;
+  products_services: string | null;
+  target_customers: string | null;
+  main_offering: string | null;
+  technologies: string[];
+  notes: string | null;
+  updated_at: string;
   opportunity_count?: number;
 }
 

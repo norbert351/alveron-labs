@@ -1,4 +1,5 @@
 import { randomBytes } from 'node:crypto';
+import { log } from '../log.ts';
 import { pool, getSetting, logActivity } from '../db.ts';
 import { config } from '../config.ts';
 import { encryptionReady, encryptSecret, decryptSecret, safeEqual } from '../security/crypto.ts';
@@ -310,6 +311,7 @@ export async function sendOutreachMessage(outreachId: number, messageId: number)
     ]);
     await logActivity({ actor: 'system', action: 'email_sent', entityType: 'outreach', entityId: outreachId, detail: { provider: account.provider, message_id: messageId } });
     await recordDailySend(fresh.id);
+    log({ op: 'email_sent', outreach_id: outreachId, message_id: messageId, account_id: fresh.id, status: 'sent', detail: { provider: account.provider, provider_message_id: result.providerMessageId } });
     return { status: 'sent', result };
   } catch (err: any) {
     const msgErr = String(err?.message || err);
@@ -325,6 +327,7 @@ export async function sendOutreachMessage(outreachId: number, messageId: number)
       messageId,
       JSON.stringify({ error: msgErr.slice(0, 500), permanent }),
     ]);
+    log({ op: 'email_send_failed', outreach_id: outreachId, message_id: messageId, account_id: fresh.id, status: 'failed', detail: { error: msgErr.slice(0, 300), permanent } });
     throw err;
   }
 }

@@ -1,4 +1,5 @@
 import { pool } from '../db.ts';
+import { log } from '../log.ts';
 import type { JobRow, JobStep } from '../types.ts';
 import { fetchSite } from './websiteFetcher.ts';
 import { researchCompany } from './CompanyResearch.ts';
@@ -78,6 +79,7 @@ function rowToJob(row: any): JobRow {
 }
 
 export async function runCompanyPipeline(jobId: number): Promise<void> {
+  log({ op: 'pipeline_start', job_id: jobId, status: 'running' });
   const job = await getJob(jobId);
   if (!job) return;
   const companyId = job.company_id;
@@ -250,6 +252,8 @@ export async function runCompanyPipeline(jobId: number): Promise<void> {
     }
     await updateJobStep(jobId, 'match', 'completed', `${findings.length} opportunities`);
 
+    log({ op: 'pipeline_complete', job_id: jobId, company_id: companyId, status: 'completed' });
+
     // Step 5: finalize
     await updateJobStep(jobId, 'finalize', 'running');
     await pool.query(
@@ -264,6 +268,7 @@ export async function runCompanyPipeline(jobId: number): Promise<void> {
     await updateJobStep(jobId, 'finalize', 'completed');
   } catch (err: any) {
     const msg = err?.message || String(err);
+    log({ op: 'pipeline_failed', job_id: jobId, company_id: companyId, status: 'failed', detail: { error: msg.slice(0, 300) } });
     const freshJob = await getJob(jobId).catch(() => null);
     const failedStep = freshJob?.current_step || job.current_step || 'fetch';
     await pool.query(

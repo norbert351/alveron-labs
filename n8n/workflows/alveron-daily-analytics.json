@@ -1,0 +1,67 @@
+{
+  "name": "Alveron Daily Analytics",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            { "field": "hours", "hoursInterval": 24 }
+          ]
+        }
+      },
+      "id": "a1",
+      "name": "Daily",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [0, 0]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://127.0.0.1:3100/api/overview",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": { "neverError": true }
+          }
+        }
+      },
+      "id": "a2",
+      "name": "Fetch Analytics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [220, 0]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://127.0.0.1:3100/api/webhook/workflow-run",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ workflow_name: 'Daily Analytics', status: 'completed', trigger: 'schedule', payload: { companies: $json.companies, opportunities: $json.opportunities, outreach: $json.outreach } }) }}",
+        "options": {}
+      },
+      "id": "a3",
+      "name": "Record Run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 0]
+    }
+  ],
+  "connections": {
+    "Daily": { "main": [[{ "node": "Fetch Analytics", "type": "main", "index": 0 }]] },
+    "Fetch Analytics": { "main": [[{ "node": "Record Run", "type": "main", "index": 0 }]] }
+  },
+  "settings": { "executionOrder": "v1" }
+}
