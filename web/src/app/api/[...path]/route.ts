@@ -3,8 +3,11 @@ import { NextRequest, NextResponse } from 'next/server';
 /**
  * Server-side proxy to the Alveron API.
  * Adds the internal Bearer token here so the browser never sees it.
- * The token lives in web/.env.local (server-only, no NEXT_PUBLIC prefix).
+ * The user session token (X-User-Token) is forwarded from the browser for
+ * user-scoped actions (approval attribution, RBAC).
+ * The token lives in web/.env.local (server-only, not NEXT_PUBLIC_).
  */
+
 const API = process.env.API_PROXY_TARGET || 'http://127.0.0.1:3100';
 const TOKEN = process.env.ALVERON_INTERNAL_TOKEN || '';
 
@@ -16,30 +19,15 @@ async function proxy(req: NextRequest, path: string[]) {
     Authorization: `Bearer ${TOKEN}`,
     'Content-Type': 'application/json',
   };
-  // pass through webhook-style headers if the frontend ever needs them
-  const wh = req.headers.get('x-webhook-key');
-  if (wh) headers['X-Webhook-Key'] = wh;
+  const userToken = req.headers.get('x-user-token');
+  if (userToken) headers['X-User-Token'] = userToken;
 
   const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await req.text();
-
-  let res: Response;
-  try {
-    res = await fetch(target, {
-      method: req.method,
-      headers,
-      body,
-      cache: 'no-store',
-    });
-  } catch (e: any) {
-    return NextResponse.json(
-      { error: `API unreachable: ${e?.message || 'proxy failure'}` },
-      { status: 502 }
-    );
-  }
+  const res = await fetch(target, { method: req.method, headers, body });
   const text = await res.text();
   return new NextResponse(text, {
     status: res.status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': res.headers.get('content-type') || 'application/json' },
   });
 }
 

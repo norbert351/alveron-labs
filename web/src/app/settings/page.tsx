@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Loader2, Save, KeyRound, Plus, Trash2, CalendarClock, Mail } from 'lucide-react';
-import { api, type SettingsData } from '@/lib/api';
+import { Loader2, Save, KeyRound, Plus, Trash2, CalendarClock, Mail, AlertOctagon, Users } from 'lucide-react';
+import { api, type EmailSafety } from '@/lib/api';
+import { getSessionUser } from '@/lib/auth';
 
 export default function SettingsPage() {
   const [data, setData] = useState<SettingsData | null>(null);
@@ -18,6 +19,18 @@ export default function SettingsPage() {
   const [fromEmail, setFromEmail] = useState('');
   const [busy, setBusy] = useState('');
   const [msg, setMsg] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
+
+  const user = getSessionUser();
+  // email safety
+  const [safety, setSafety] = useState<EmailSafety>({ pause_all: false, daily_limit: 20, min_delay_minutes: 5, max_follow_ups: 2 });
+  const [dailyLimit, setDailyLimit] = useState(20);
+  const [minDelay, setMinDelay] = useState(5);
+  const [maxFu, setMaxFu] = useState(2);
+  // user management
+  const [users, setUsers] = useState<{ id: number; name: string; email: string; role: string }[]>([]);
+  const [newUserName, setNewUserName] = useState('');
+  const [newUserEmail, setNewUserEmail] = useState('');
+  const [newUserPass, setNewUserPass] = useState('');
 
   useEffect(() => {
     api
@@ -35,7 +48,80 @@ export default function SettingsPage() {
         setFromEmail(d.email.from_email);
       })
       .catch((e) => setMsg({ kind: 'err', text: e.message }));
-  }, []);
+
+    api
+      .get<{ safety: EmailSafety }>('/api/email-safety')
+      .then((d) => {
+        setSafety(d.safety);
+        setDailyLimit(d.safety.daily_limit);
+        setMinDelay(d.safety.min_delay_minutes);
+        setMaxFu(d.safety.max_follow_ups);
+      })
+      .catch(() => {});
+    if (user?.role === 'owner') {
+      api
+        .get<{ users: { id: number; name: string; email: string; role: string }[] }>('/api/users')
+        .then((d) => setUsers(d.users))
+        .catch(() => {});
+    }
+  }, [user?.role]);
+
+  async function togglePause() {
+    setBusy('pause');
+    try {
+      const d = await api.put<{ safety: EmailSafety }>('/api/email-safety', { pause_all: !safety.pause_all });
+      setSafety(d.safety);
+      setMsg({ kind: 'ok', text: d.safety.pause_all ? 'Outreach paused globally' : 'Outreach resumed' });
+    } catch (e: any) {
+      setMsg({ kind: 'err', text: e.message });
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function saveSafety() {
+    setBusy('safety');
+    try {
+      const d = await api.put<{ safety: EmailSafety }>('/api/email-safety', {
+        daily_limit: dailyLimit,
+        min_delay_minutes: minDelay,
+        max_follow_ups: maxFu,
+      });
+      setSafety(d.safety);
+      setMsg({ kind: 'ok', text: 'Safety limits saved' });
+    } catch (e: any) {
+      setMsg({ kind: 'err', text: e.message });
+    } finally {
+      setBusy('');
+    }
+  }
+
+  async function changeRole(id: number, role: string) {
+    try {
+      await api.patch(`/api/users/${id}/role`, { role });
+      setUsers(users.map((u) => (u.id === id ? { ...u, role } : u)));
+      setMsg({ kind: 'ok', text: 'Role updated' });
+    } catch (e: any) {
+      setMsg({ kind: 'err', text: e.message });
+    }
+  }
+
+  async function addUser() {
+    setBusy('adduser');
+    try {
+      await api.post('/api/users', { name: newUserName, email: newUserEmail, password: newUserPass, role: 'member' });
+      const d = await api.get<{ users: { id: number; name: string; email: string; role: string }[] }>('/api/users');
+      setUsers(d.users);
+      setNewUserName('');
+      setNewUserEmail('');
+      setNewUserPass('');
+      setMsg({ kind: 'ok', text: 'User added' });
+    } catch (e: any) {
+      setMsg({ kind: 'err', text: e.message });
+    } finally {
+      setBusy('');
+    }
+  }
 
   async function saveLlm() {
     setBusy('llm');
@@ -216,6 +302,83 @@ export default function SettingsPage() {
           </button>
         </div>
       </div>
+
+      <div className="card mt-6 p-6">
+        <div className="mb-4 flex items-center gap-2">
+          <AlertOctagon size={16} className="text-red-400" />
+          <div className="section-title">Email safety</div>
+        </div>
+        <div className="mb-4 flex items-center justify-between rounded-lg border border-red-500/20 bg-red-500/5 p-4">
+          <div>
+            <div className="text-sm font-medium text-ink">Pause all outreach</div>
+            <div className="text-xs text-ink-muted">Blocks new sends and follow-ups at the API level. Queued emails stay queued.</div>
+          </div>
+          <button
+            className={`${safety.pause_all ? 'btn-danger' : 'btn-ghost'} justify-center`}
+            onClick={togglePause}
+            disabled={busy === 'pause'}
+          >
+            {busy === 'pause' ? <Loader2 size={14} className="animate-spin" /> : safety.pause_all ? 'Resume outreach' : 'PAUSE ALL OUTREACH'}
+          </button>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div>
+            <label className="label">Daily send limit (per account)</label>
+            <input className="input font-mono" type="number" min={1} max={500} value={dailyLimit} onChange={(e) => setDailyLimit(Number(e.target.value))} />
+          </div>
+          <div>
+            <label className="label">Min delay between sends (minutes)</label>
+            <input className="input font-mono" type="number" min={0} max={120} value={minDelay} onChange={(e) => setMinDelay(Number(e.target.value))} />
+          </div>
+          <div>
+            <label className="label">Max follow-ups per prospect</label>
+            <input className="input font-mono" type="number" min={0} max={10} value={maxFu} onChange={(e) => setMaxFu(Number(e.target.value))} />
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <button className="btn-primary" onClick={saveSafety} disabled={busy === 'safety'}>
+            {busy === 'safety' ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save safety limits
+          </button>
+        </div>
+      </div>
+
+      {user?.role === 'owner' && (
+        <div className="card mt-6 p-6">
+          <div className="mb-4 flex items-center gap-2">
+            <Users size={16} className="text-electric-bright" />
+            <div className="section-title">User management</div>
+          </div>
+          <div className="mb-4 space-y-2">
+            {users.map((u) => (
+              <div key={u.id} className="flex items-center justify-between rounded-lg bg-obsidian-raised/60 px-3 py-2.5">
+                <div>
+                  <div className="text-sm text-ink">{u.name}</div>
+                  <div className="text-xs text-ink-muted">{u.email}</div>
+                </div>
+                <select
+                  className="input w-32 font-mono text-xs"
+                  value={u.role}
+                  onChange={(e) => changeRole(u.id, e.target.value)}
+                >
+                  <option value="owner">owner</option>
+                  <option value="admin">admin</option>
+                  <option value="member">member</option>
+                </select>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <input className="input" placeholder="Name" value={newUserName} onChange={(e) => setNewUserName(e.target.value)} />
+            <input className="input" placeholder="Email" value={newUserEmail} onChange={(e) => setNewUserEmail(e.target.value)} />
+            <input className="input" type="password" placeholder="Password (10+ chars)" value={newUserPass} onChange={(e) => setNewUserPass(e.target.value)} />
+          </div>
+          <div className="mt-3 flex justify-end">
+            <button className="btn-primary" onClick={addUser} disabled={busy === 'adduser'}>
+              {busy === 'adduser' ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />} Add user
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="card mt-6 p-6">
         <div className="mb-4 flex items-center gap-2">

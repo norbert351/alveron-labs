@@ -11,6 +11,9 @@ import { registerSettingsRoutes } from './routes/settings.ts';
 import { registerOverviewRoutes } from './routes/overview.ts';
 import { registerWebhookRoutes } from './routes/webhooks.ts';
 import { registerWorkflowRoutes } from './routes/workflows.ts';
+import { registerAuthRoutes } from './routes/auth.ts';
+import { registerEmailAccountRoutes } from './routes/emailAccounts.ts';
+import { registerLeadSourceRoutes } from './routes/leadSources.ts';
 
 async function main() {
   await initDb();
@@ -29,7 +32,11 @@ async function main() {
   );
   console.log('[alveron-api] database ready');
 
-  const app = Fastify({ logger: false, bodyLimit: 2 * 1024 * 1024 });
+  const app = Fastify({ logger: false, bodyLimit: 4 * 1024 * 1024 });
+  // CSV import support
+  app.addContentTypeParser('text/csv', { parseAs: 'string' }, (_req, body, done) => {
+    done(null, body);
+  });
   await app.register(cors, { origin: true });
   await registerSecurity(app);
 
@@ -43,6 +50,9 @@ async function main() {
   registerOverviewRoutes(app);
   registerWorkflowRoutes(app);
   registerWebhookRoutes(app);
+  registerAuthRoutes(app);
+  registerEmailAccountRoutes(app);
+  registerLeadSourceRoutes(app);
 
   await app.listen({ port: config.port, host: '0.0.0.0' });
   console.log(`[alveron-api] listening on http://0.0.0.0:${config.port}`);

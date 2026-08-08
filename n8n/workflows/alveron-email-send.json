@@ -5,10 +5,7 @@
       "parameters": {
         "rule": {
           "interval": [
-            {
-              "field": "minutes",
-              "minutesInterval": 5
-            }
+            { "field": "minutes", "minutesInterval": 5 }
           ]
         }
       },
@@ -16,10 +13,7 @@
       "name": "Every 5 minutes",
       "type": "n8n-nodes-base.scheduleTrigger",
       "typeVersion": 1.2,
-      "position": [
-        0,
-        0
-      ]
+      "position": [0, 0]
     },
     {
       "parameters": {
@@ -28,10 +22,7 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "X-Webhook-Key",
-              "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}"
-            }
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
           ]
         },
         "options": {}
@@ -40,10 +31,7 @@
       "name": "Get Queue",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        220,
-        0
-      ]
+      "position": [220, 0]
     },
     {
       "parameters": {
@@ -53,105 +41,60 @@
       "name": "Split Out Items",
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [
-        440,
-        0
-      ]
+      "position": [440, 0]
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $env.EMAIL_PROVIDER_URL || 'http://127.0.0.1:3199/send' }}",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ to: $json.target_company, subject: $json.subject, html: $json.body, from: ($env.EMAIL_FROM || 'outreach@alveronlabs.dev') }) }}",
-        "options": {}
-      },
-      "id": "e4",
-      "name": "Send via Provider",
-      "type": "n8n-nodes-base.httpRequest",
-      "typeVersion": 4.2,
-      "position": [
-        660,
-        0
-      ]
-    },
-    {
-      "parameters": {
-        "method": "POST",
-        "url": "=http://127.0.0.1:3100/api/webhook/outreach/{{ $('Split Out Items').item.json.outreach_id }}/message",
+        "url": "=http://127.0.0.1:3100/api/webhook/outreach/{{ $json.outreach_id }}/send",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            {
-              "name": "X-Webhook-Key",
-              "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}"
-            }
+            { "name": "X-Webhook-Key", "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ status: 'sent', provider: $json.provider || 'email-provider', provider_message_id: $json.id || null }) }}",
-        "options": {}
+        "jsonBody": "={{ JSON.stringify({ message_id: $json.message_id }) }}",
+        "options": {
+          "response": {
+            "response": { "neverError": true }
+          }
+        }
       },
-      "id": "e5",
-      "name": "Record Sent",
+      "id": "e4",
+      "name": "Send via Alveron API",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        880,
-        0
-      ]
+      "position": [660, 0]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "e5c",
+              "leftValue": "={{ $json.code }}",
+              "rightValue": "outreach_paused",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "e5",
+      "name": "Paused?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [880, 0]
     }
   ],
   "connections": {
-    "Every 5 minutes": {
-      "main": [
-        [
-          {
-            "node": "Get Queue",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Get Queue": {
-      "main": [
-        [
-          {
-            "node": "Split Out Items",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Split Out Items": {
-      "main": [
-        [
-          {
-            "node": "Send via Provider",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Send via Provider": {
-      "main": [
-        [
-          {
-            "node": "Record Sent",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    }
+    "Every 5 minutes": { "main": [[{ "node": "Get Queue", "type": "main", "index": 0 }]] },
+    "Get Queue": { "main": [[{ "node": "Split Out Items", "type": "main", "index": 0 }]] },
+    "Split Out Items": { "main": [[{ "node": "Send via Alveron API", "type": "main", "index": 0 }]] },
+    "Send via Alveron API": { "main": [[{ "node": "Paused?", "type": "main", "index": 0 }]] },
+    "Paused?": { "main": [[], []] }
   },
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "active": false
+  "settings": { "executionOrder": "v1" }
 }

@@ -120,7 +120,28 @@ export async function fetchSite(rawUrl: string): Promise<SiteSnapshot> {
   const { html, finalUrl } = await fetchWithTimeout(url);
   const $ = cheerio.load(html);
 
-  const title = $('title').first().text().trim() || '';
+  let title = $('title').first().text().trim() || '';
+  const plainText = extractText($, html);
+  let rendered = false;
+
+  // SPA fallback: if the plain fetch yielded almost no visible text, render with a
+  // real headless browser (SSRF-guarded) to capture client-side content.
+  if (config.fetcher.browserFallback && plainText.length < 400) {
+    try {
+      const { renderWithBrowser } = await import('./browserRender.ts');
+      const page = await renderWithBrowser(finalUrl, 40000);
+      rendered = page.rendered;
+      if (rendered && page.text.length > plainText.length) {
+        // replace the top-level page content with the rendered version
+        const renderedText = page.text.slice(0, config.fetcher.maxContentChars);
+        $('body').empty().text(renderedText);
+        if (!title && page.title) title = page.title;
+      }
+    } catch {
+      /* browser render is best-effort; the plain fetch result still stands */
+    }
+  }
+
   const metaDescription = $('meta[name="description"]').attr('content')?.trim() || '';
   const h1s = $('h1')
     .map((_, el) => $(el).text().trim())

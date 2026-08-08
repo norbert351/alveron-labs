@@ -4,30 +4,30 @@ export interface OpportunityScore {
   score: number;
   evidence_quality: number;
   problem_severity: number;
+  business_relevance: number;
   alveron_fit: number;
-  confidence: number;
-  operational_value: number;
   feasibility: number;
-  complexity: number;
+  confidence: number;
   rationale: string;
 }
 
 const SYSTEM = `You are a lead scoring analyst at Alveron Labs, an AI Product and Automation Studio.
-Score ONE detected opportunity for a prospect company on a 0-100 scale.
-Consider:
-- Evidence quality: how concrete and verifiable the observed evidence is
-- Problem severity: how much the problem costs the business (leads, hours, friction)
-- Alveron fit: how well the matched Alveron service solves it
-- Confidence: analyst confidence in the finding
-- Operational value: the operational benefit of solving it
-- Feasibility: how realistic the solution is with the company's observed stack
-- Complexity: project complexity, 1 = trivial, 5 = very complex (used as a mild penalty)
+Score ONE detected opportunity for a prospect company on a 0-100 scale using transparent components:
+- evidence_quality (0-100): how concrete and quotable the observed evidence is
+- problem_severity (0-100): how much the problem costs the business
+- business_relevance (0-100): how core the affected process is to revenue/operations
+- alveron_fit (0-100): how well the matched Alveron service solves it
+- feasibility (0-100): how realistic the solution is with the observed stack
+- confidence (0-100): analyst confidence the problem is real, not a crawl artifact
 
+Calibration (do NOT force scores into buckets, let honesty land where it lands):
+80-100 = High priority, 60-79 = Medium, 40-59 = Low, 0-39 = Poor fit.
 Rules:
 - Be conservative. A mediocre opportunity should score below 60.
 - Do not inflate scores. No score above 95.
-- Return STRICT JSON with keys: score, evidence_quality, problem_severity, alveron_fit, confidence, operational_value, feasibility, complexity, rationale.
-- All component scores 0-100 except complexity (1-5). rationale: 1-2 sentences.`;
+- Be sceptical of unrendered JavaScript placeholders, templates, and generic boilerplate.
+- Return STRICT JSON with keys: score, evidence_quality, problem_severity, business_relevance, alveron_fit, feasibility, confidence, rationale.
+- All component scores 0-100. rationale: 1-2 sentences explaining the final score.`;
 
 export async function scoreOpportunity(input: {
   companyName: string;
@@ -58,17 +58,17 @@ export async function scoreOpportunity(input: {
     score: clamp(result.score, 0, 100, 50),
     evidence_quality: clamp(result.evidence_quality, 0, 100, 50),
     problem_severity: clamp(result.problem_severity, 0, 100, 50),
+    business_relevance: clamp(result.business_relevance, 0, 100, 50),
     alveron_fit: clamp(result.alveron_fit, 0, 100, 50),
     confidence: clamp(result.confidence, 0, 100, 50),
-    operational_value: clamp(result.operational_value, 0, 100, 50),
     feasibility: clamp(result.feasibility, 0, 100, 50),
-    complexity: clamp(result.complexity, 1, 5, 3),
     rationale: String(result.rationale || '').trim(),
   };
 }
 
-export function priorityFromScore(score: number): string {
-  if (score >= 75) return 'High';
-  if (score >= 50) return 'Medium';
-  return 'Low';
+export function priorityFromScore(score: number): 'High' | 'Medium' | 'Low' | 'Poor fit' {
+  if (score >= 80) return 'High';
+  if (score >= 60) return 'Medium';
+  if (score >= 40) return 'Low';
+  return 'Poor fit';
 }

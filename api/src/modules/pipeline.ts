@@ -212,8 +212,8 @@ export async function runCompanyPipeline(jobId: number): Promise<void> {
         await pool.query(
           `UPDATE opportunities SET
              score = $2, score_evidence_quality = $3, score_problem_severity = $4,
-             score_alveron_fit = $5, score_operational_value = $6, score_feasibility = $7,
-             score_complexity = $8, score_rationale = $9, priority = $10
+             score_alveron_fit = $5, score_business_relevance = $6, score_feasibility = $7,
+             score_rationale = $8, priority = $9
            WHERE id = $1`,
           [
             opportunityId,
@@ -221,9 +221,8 @@ export async function runCompanyPipeline(jobId: number): Promise<void> {
             score.evidence_quality,
             score.problem_severity,
             score.alveron_fit,
-            score.operational_value,
+            score.business_relevance,
             score.feasibility,
-            score.complexity,
             score.rationale,
             priorityFromScore(score.score),
           ]
@@ -231,8 +230,8 @@ export async function runCompanyPipeline(jobId: number): Promise<void> {
         await pool.query(
           `INSERT INTO lead_scores
              (opportunity_id, score, evidence_quality, problem_severity, alveron_fit,
-              confidence, operational_value, feasibility, complexity, rationale)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              confidence, business_relevance, feasibility, rationale)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [
             opportunityId,
             score.score,
@@ -240,9 +239,8 @@ export async function runCompanyPipeline(jobId: number): Promise<void> {
             score.problem_severity,
             score.alveron_fit,
             score.confidence,
-            score.operational_value,
+            score.business_relevance,
             score.feasibility,
-            score.complexity,
             score.rationale,
           ]
         );

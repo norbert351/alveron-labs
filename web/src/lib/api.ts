@@ -1,9 +1,14 @@
 const API = process.env.NEXT_PUBLIC_API_URL || '';
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...(options?.headers || {}) };
+  if (typeof window !== 'undefined') {
+    const t = localStorage.getItem('alveron_session_token');
+    if (t) headers['X-User-Token'] = t;
+  }
   const res = await fetch(`${API}${path}`, {
     ...options,
-    headers: { 'Content-Type': 'application/json', ...(options?.headers || {}) },
+    headers,
     cache: 'no-store',
   });
   const data = await res.json().catch(() => ({}));
@@ -50,21 +55,18 @@ export const PIPELINE_STAGES = [
   'Approved',
   'Contacted',
   'Replied',
+  'Interested',
   'Meeting',
+  'Proposal Sent',
   'Won',
   'Lost',
-] as const;
+  'Paused',
+];
 
 export interface Company {
   id: number;
   name: string;
   website: string;
-  notes: string;
-  industry: string | null;
-  products_services: string | null;
-  target_customers: string | null;
-  main_offering: string | null;
-  technologies: string[];
   status: string;
   stage: string;
   lead_source: string | null;
@@ -227,4 +229,68 @@ export interface SettingsData {
   services: { name: string; description: string }[];
   followUp: { enabled: boolean; days: number[]; max_follow_ups: number };
   email: { provider: string; from_name: string; from_email: string };
+}
+
+
+export interface User {
+  id: number;
+  name: string;
+  email: string;
+  role: 'owner' | 'admin' | 'member';
+}
+
+export interface EmailAccount {
+  id: number;
+  provider: 'gmail' | 'microsoft' | 'resend';
+  email: string;
+  label: string | null;
+  purpose: 'outreach' | 'transactional';
+  is_default: boolean;
+  status: 'connected' | 'disconnected' | 'error' | 'pending';
+  last_token_refresh_at: string | null;
+  last_send_at: string | null;
+  daily_send_count: number;
+  daily_send_date: string | null;
+  last_error: string | null;
+  created_at: string;
+}
+
+export interface ProviderConfig {
+  kind: 'gmail' | 'microsoft' | 'resend';
+  configured: boolean;
+  missing: string[];
+}
+
+export interface EmailSafety {
+  pause_all: boolean;
+  daily_limit: number;
+  min_delay_minutes: number;
+  max_follow_ups: number;
+}
+
+export interface QueueItem {
+  id: number;
+  subject: string;
+  target_company: string;
+  status: string;
+  approved_by: string | null;
+  approved_at: string | null;
+  message_id: number | null;
+  message_status: string | null;
+  provider: string | null;
+  provider_message_id: string | null;
+  error_code: string | null;
+  error_message: string | null;
+  attempts: number;
+  sent_at: string | null;
+  failed_at: string | null;
+}
+
+export interface ActivityEvent {
+  id: number;
+  outreach_id: number;
+  message_id: number | null;
+  event: string;
+  detail: string | null;
+  created_at: string;
 }

@@ -112,7 +112,7 @@ export function registerCompanyRoutes(app: FastifyInstance) {
     const id = Number((req.params as any).id);
     const body: any = req.body || {};
     const stage = String(body.stage || '').trim();
-    const allowed = ['Discovered', 'Researching', 'Qualified', 'Proposal Ready', 'Approved', 'Contacted', 'Replied', 'Meeting', 'Won', 'Lost'];
+    const allowed = ['Discovered', 'Researching', 'Qualified', 'Proposal Ready', 'Approved', 'Contacted', 'Replied', 'Interested', 'Meeting', 'Proposal Sent', 'Won', 'Lost', 'Paused'];
     if (!allowed.includes(stage)) {
       return reply.code(400).send({ error: `stage must be one of: ${allowed.join(', ')}` });
     }

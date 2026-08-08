@@ -24,44 +24,7 @@ export function registerWorkflowRoutes(app: FastifyInstance) {
     reply.send({ runs: res.rows });
   });
 
-  // Lead discovery sources (controlled)
-  app.get('/api/lead-sources', async (_req, reply) => {
-    const res = await pool.query(`SELECT * FROM lead_sources ORDER BY created_at DESC`);
-    reply.send({ sources: res.rows });
-  });
-
-  app.post('/api/lead-sources', async (req, reply) => {
-    const body: any = req.body || {};
-    const name = String(body.name || '').trim();
-    if (!name) return reply.code(400).send({ error: 'name is required' });
-    const res = await pool.query(
-      `INSERT INTO lead_sources (name, kind, config) VALUES ($1, $2, $3) ON CONFLICT (name) DO UPDATE SET enabled = true RETURNING *`,
-      [name, String(body.kind || 'manual'), JSON.stringify(body.config || {})]
-    );
-    reply.code(201).send({ source: res.rows[0] });
-  });
-
-  // Leads list
-  app.get('/api/leads', async (req, reply) => {
-    const { source, status, limit } = req.query as any;
-    const conds: string[] = [];
-    const params: any[] = [];
-    if (source) {
-      params.push(String(source));
-      conds.push(`source = $${params.length}`);
-    }
-    if (status) {
-      params.push(String(status));
-      conds.push(`status = $${params.length}`);
-    }
-    const where = conds.length ? 'WHERE ' + conds.join(' AND ') : '';
-    const max = Math.min(Number(limit) || 100, 200);
-    const res = await pool.query(
-      `SELECT * FROM leads ${where} ORDER BY created_at DESC LIMIT $${params.length + 1}`,
-      [...params, max]
-    );
-    reply.send({ leads: res.rows });
-  });
+  // (lead sources + leads list live in routes/leadSources.ts)
 
   // Promote a lead into a company + research (with duplicate + active-job guard)
   app.post('/api/leads/:id/promote', async (req, reply) => {
