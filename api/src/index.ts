@@ -16,6 +16,7 @@ import { registerWorkflowRoutes } from './routes/workflows.ts';
 import { registerAuthRoutes } from './routes/auth.ts';
 import { registerEmailAccountRoutes } from './routes/emailAccounts.ts';
 import { registerLeadSourceRoutes } from './routes/leadSources.ts';
+import { registerResearchRoutes } from './routes/research.ts';
 
 async function main() {
   await initDb();
@@ -31,7 +32,20 @@ async function main() {
   await pool.query(
     `UPDATE research_reports SET status = 'failed', error = 'API restarted while report was active'
      WHERE status IN ('pending', 'running')`
-  );
+  ).catch(() => {});
+  // Phase 12 research engine: mark in-flight runs as failed so they can be re-run.
+  await pool.query(
+    `UPDATE research_runs SET status = 'failed', error = 'API restarted while research run was active', completed_at = now()
+     WHERE status IN ('pending', 'running')`
+  ).catch(() => {});
+  await pool.query(
+    `UPDATE research_company_results SET status = 'failed', error = 'API restarted while company research was active', updated_at = now()
+     WHERE status IN ('pending', 'running')`
+  ).catch(() => {});
+  await pool.query(
+    `UPDATE crawl_runs SET status = 'FAILED', error = 'API restarted while crawl was active', completed_at = now()
+     WHERE status IN ('pending', 'running')`
+  ).catch(() => {});
   console.log('[alveron-api] database ready');
 
   const app = Fastify({
@@ -86,6 +100,7 @@ async function main() {
   registerAuthRoutes(app);
   registerEmailAccountRoutes(app);
   registerLeadSourceRoutes(app);
+  registerResearchRoutes(app);
 
   await app.listen({ port: config.port, host: '0.0.0.0' });
   console.log(`[alveron-api] listening on http://0.0.0.0:${config.port}`);

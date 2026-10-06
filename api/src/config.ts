@@ -51,6 +51,49 @@ export const config = {
     maxContentChars: Number(process.env.ALVERON_FETCH_MAX_CONTENT_CHARS || 120000),
     browserFallback: process.env.ALVERON_BROWSER_FALLBACK !== 'false',
   },
+
+  // ---------------------------------------------------------------
+  // Phase 12 — Global research engine
+  // ---------------------------------------------------------------
+  /** AI reasoning layer. Groq is the primary provider (spec section 4). */
+  ai: {
+    provider: process.env.ALVERON_AI_PROVIDER || 'groq',
+    groq: {
+      apiKey: process.env.GROQ_API_KEY || '',
+      baseUrl: process.env.GROQ_BASE_URL || 'https://api.groq.com/openai/v1',
+      model: process.env.GROQ_MODEL || 'llama-3.3-70b-versatile',
+      timeoutMs: Number(process.env.GROQ_TIMEOUT_MS || 60000),
+      maxRetries: Number(process.env.GROQ_MAX_RETRIES || 3),
+    },
+  },
+  /** Discovery provider abstraction — Overpass/OSM needs no credentials. */
+  discovery: {
+    provider: process.env.ALVERON_DISCOVERY_PROVIDER || 'overpass',
+    overpassUrl: process.env.ALVERON_OVERPASS_URL || 'https://overpass-api.de/api/interpreter',
+    nominatimUrl: process.env.ALVERON_NOMINATIM_URL || 'https://nominatim.openstreetmap.org',
+    contactEmail: process.env.ALVERON_CONTACT_EMAIL || 'research@alveron-labs.example',
+    timeoutMs: Number(process.env.ALVERON_DISCOVERY_TIMEOUT_MS || 120000),
+    maxResults: Number(process.env.ALVERON_DISCOVERY_MAX_RESULTS || 400),
+  },
+  /** Tiered crawler limits (spec sections 7, 8, 21, 28) */
+  crawler: {
+    maxPages: Number(process.env.ALVERON_CRAWL_MAX_PAGES || 12),
+    maxBytes: Number(process.env.ALVERON_CRAWL_MAX_BYTES || 3_000_000),
+    timeoutMs: Number(process.env.ALVERON_CRAWL_TIMEOUT_MS || 20000),
+    maxDepth: Number(process.env.ALVERON_CRAWL_MAX_DEPTH || 2),
+    concurrencyHttp: Number(process.env.ALVERON_CRAWL_CONCURRENCY_HTTP || 6),
+    concurrencyBrowser: Number(process.env.ALVERON_CRAWL_CONCURRENCY_BROWSER || 1),
+    respectRobots: process.env.ALVERON_CRAWL_RESPECT_ROBOTS !== 'false',
+    screenshots: process.env.ALVERON_CRAWL_SCREENSHOTS === 'true',
+    screenshotDir: process.env.ALVERON_SCREENSHOT_DIR || '/tmp/alveron-screenshots',
+  },
+  /** Re-research guard (spec section 24) */
+  research: {
+    reCrawlDays: Number(process.env.ALVERON_RESEARCH_RE_CRAWL_DAYS || 7),
+    companyConcurrency: Number(process.env.ALVERON_RESEARCH_COMPANY_CONCURRENCY || 2),
+    /** Hard per-company safety timeout so a single hung site can't stall a run. */
+    companyTimeoutMs: Number(process.env.ALVERON_RESEARCH_COMPANY_TIMEOUT_MS || 180000),
+  },
 };
 
 /** Delivery statuses accepted from providers / n8n */

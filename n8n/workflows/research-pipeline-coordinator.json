@@ -1,0 +1,175 @@
+{
+  "name": "research-pipeline-coordinator",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "research/coordinator",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "n15",
+      "name": "Coordinator Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.ALVERON_API_BASE }}/api/webhook/research/run",
+        "method": "POST",
+        "sendBody": true,
+        "jsonBody": "={{ JSON.stringify({ country: $json.body?.country, region: $json.body?.region, city: $json.body?.city, industry: $json.body?.industry, language: $json.body?.language, count: $json.body?.count || 20, force: $json.body?.force }) }}",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Key",
+              "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120
+        }
+      },
+      "id": "n16",
+      "name": "Start Research Run",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.ALVERON_API_BASE }}/api/webhook/research/status/={ $json.code === 201 ? $json.body.run_id : $json.run_id }",
+        "method": "GET",
+        "sendBody": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Key",
+              "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120
+        }
+      },
+      "id": "n17",
+      "name": "Check Status",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ Array.isArray($json.run) && ['completed','failed','partial'].includes($json.run.status) }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true"
+              },
+              "options": {
+                "ignoreCase": true
+              }
+            }
+          ]
+        }
+      },
+      "id": "n18",
+      "name": "Is Complete",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "n19",
+      "name": "Done",
+      "type": "n8n-nodes-base.stopAndError",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Coordinator Trigger": {
+      "main": [
+        [
+          {
+            "node": "Start Research Run",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Start Research Run": {
+      "main": [
+        [
+          {
+            "node": "Check Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Status": {
+      "main": [
+        [
+          {
+            "node": "Is Complete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Complete": {
+      "main": [
+        [
+          {
+            "node": "Done",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

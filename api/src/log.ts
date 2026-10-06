@@ -9,6 +9,7 @@ export interface LogFields {
   request_id?: string;
   job_id?: number;
   company_id?: number;
+  run_id?: string;
   lead_id?: number;
   user_id?: number;
   workflow_id?: string;

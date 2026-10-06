@@ -1,0 +1,69 @@
+{
+  "name": "research-ai-problem-detection",
+  "active": false,
+  "nodes": [
+    {
+      "parameters": {
+        "path": "research/analyze",
+        "httpMethod": "POST",
+        "responseMode": "lastNode",
+        "options": {}
+      },
+      "id": "n9",
+      "name": "AI Problems Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ $env.ALVERON_API_BASE }}/api/webhook/research/company/analyze",
+        "method": "POST",
+        "sendBody": true,
+        "jsonBody": "={{ JSON.stringify({ run_id: $json.body?.run_id, company_id: $json.body?.company_id }) }}",
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Key",
+              "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 120
+        }
+      },
+      "id": "n10",
+      "name": "Detect Problems",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        0,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "AI Problems Trigger": {
+      "main": [
+        [
+          {
+            "node": "Detect Problems",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

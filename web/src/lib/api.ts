@@ -302,3 +302,101 @@ export interface ActivityEvent {
   detail: string | null;
   created_at: string;
 }
+
+// ---- Research runs -------------------------------------------------------------
+
+export interface ResearchRunStats {
+  discovered: number;
+  valid_websites: number;
+  crawled: number;
+  analyzed: number;
+  problems: number;
+  opportunities: number;
+  failed: number;
+  ai_failed: number;
+}
+
+export interface ResearchRun {
+  run_id: string;
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  industry: string | null;
+  language: string | null;
+  requested_count: number;
+  status: string;
+  statistics: ResearchRunStats;
+  error: string | null;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface ResearchMeta {
+  ai: { configured: boolean; provider: string | null; missing: string[] };
+  discovery_providers: string[];
+  industries: string[];
+  service_catalog: string[];
+}
+
+export interface ResearchCompanyResult {
+  company_name: string;
+  website: string;
+  company_id: number | string;
+  country: string | null;
+  region: string | null;
+  city: string | null;
+  status: string;
+  outcome: string | null;
+  problems_count: number;
+  opportunities_count: number;
+  crawl_status: string;
+  pages_completed: number;
+  render_used: string | null;
+  error: string | null;
+}
+
+export interface ResearchRunDetail {
+  run: ResearchRun;
+  results: ResearchCompanyResult[];
+  errors: string[];
+  is_running: boolean;
+}
+
+export interface CompanyEvidence {
+  url?: string;
+  text?: string;
+  type?: string;
+}
+
+export interface CompanyFinding {
+  category?: string;
+  severity?: string;
+  description?: string;
+  confidence?: number | string;
+  title?: string;
+  summary?: string;
+  evidence?: CompanyEvidence[];
+  [key: string]: unknown;
+}
+
+export interface CompanyOpportunity {
+  title?: string;
+  description?: string;
+  overall_score?: number | string;
+  priority?: string;
+  components?: Record<string, unknown> | null;
+  service_codes?: string[];
+  service?: string;
+  [key: string]: unknown;
+}
+
+export interface CompanyResearchDetail {
+  company: Record<string, unknown> | null;
+  crawl_run: Record<string, unknown> | null;
+  findings: CompanyFinding[];
+  problems: CompanyFinding[];
+  opportunities: CompanyOpportunity[];
+  scores: Record<string, unknown>[];
+  service_recommendations: string[];
+  evidence: CompanyEvidence[];
+}
