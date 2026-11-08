@@ -63,7 +63,7 @@ export function salaryRange(value: unknown): { min: number | null; max: number |
   if (typeof value === 'number' && Number.isFinite(value)) return { min: value, max: value, currency: 'USD' };
   if (typeof value !== 'string') return { min: null, max: null, currency: null };
   const currency = /\bNGN\b|₦/i.test(value) ? 'NGN' : /\bEUR\b|€/i.test(value) ? 'EUR' : /\bGBP\b|£/i.test(value) ? 'GBP' : /\$|\bUSD\b/i.test(value) ? 'USD' : null;
-  const numbers = Array.from(value.replace(/,/g, '').matchAll(/(\d+(?:\.\d+)?)\s*(k|m)?/gi)).map((match) => Number(match[1]) * (match[2]?.toLowerCase() === 'm' ? 1000000 : match[2]?.toLowerCase() === 'k' ? 1000 : 1)).filter(Number.isFinite);
+  const numbers = Array.from(value.replace(/,/g, '').matchAll(/(\d+(?:\.\d+)?)\s*(k|m)?(?![a-z])/gi)).map((match) => Number(match[1]) * (match[2]?.toLowerCase() === 'm' ? 1000000 : match[2]?.toLowerCase() === 'k' ? 1000 : 1)).filter(Number.isFinite);
   return { min: numbers.length ? Math.min(...numbers) : null, max: numbers.length ? Math.max(...numbers) : null, currency };
 }
 
