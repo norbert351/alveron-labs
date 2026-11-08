@@ -48,7 +48,7 @@ export function safeListingUrl(value: unknown, allowedHost: string): string | nu
   } catch { return null; }
 }
 
-function tags(value: unknown): string[] {
+function isoDate(value: string | null): string | null {\n  if (!value) return null;\n  const date = new Date(value);\n  return Number.isNaN(date.getTime()) ? null : date.toISOString();\n}\n\nfunction tags(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => text(item, 80)).filter((item): item is string => Boolean(item)).slice(0, 40);
 }
@@ -165,7 +165,7 @@ async function ingestProvider(
           job.company, job.location, job.employmentType, job.salaryMin, job.salaryMax,
           job.currency, JSON.stringify(job.tags),
           JSON.stringify([{ url: job.url, text: 'Original listing supplied by ' + source, type: 'source_listing' }]),
-          job.publishedAt, runId,
+          isoDate(job.publishedAt), runId,
         ]
       );
       if (result.rowCount) inserted++;
