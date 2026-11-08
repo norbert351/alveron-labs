@@ -11,7 +11,7 @@ type Profile = {
   skills: string[];
   experience: Record<string, unknown>;
   preferences: { remoteOnly?: boolean; preferredTypes?: string[] };
-  constraints: { blockedTypes?: string[]; minimumCompensation?: number; allowedCurrencies?: string[] };
+  constraints: { blockedTypes?: string[]; minimumCompensation?: number; minimumCompensationCurrency?: string; allowedCurrencies?: string[] };
 };
 const TYPES = [
   ['remote_job', 'Remote jobs'],
@@ -26,9 +26,13 @@ export default function OpportunityProfilePage() {
   const [name, setName] = useState('Primary profile');
   const [skills, setSkills] = useState('');
   const [remoteOnly, setRemoteOnly] = useState(false);
+  const [country, setCountry] = useState('');
+  const [experienceSummary, setExperienceSummary] = useState('');
+  const [yearsExperience, setYearsExperience] = useState('');
   const [preferred, setPreferred] = useState<string[]>([]);
   const [blocked, setBlocked] = useState<string[]>([]);
   const [minimum, setMinimum] = useState('');
+  const [minimumCurrency, setMinimumCurrency] = useState('USD');
   const [currencies, setCurrencies] = useState('USD, NGN');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -39,9 +43,13 @@ export default function OpportunityProfilePage() {
       setName(profile.display_name || 'Primary profile');
       setSkills((profile.skills || []).join(', '));
       setRemoteOnly(profile.preferences?.remoteOnly ?? false);
+      setCountry(String(profile.preferences?.country || ''));
+      setExperienceSummary(String(profile.experience?.summary || ''));
+      setYearsExperience(profile.experience?.years == null ? '' : String(profile.experience.years));
       setPreferred(profile.preferences?.preferredTypes || []);
       setBlocked(profile.constraints?.blockedTypes || []);
       setMinimum(profile.constraints?.minimumCompensation == null ? '' : String(profile.constraints.minimumCompensation));
+      setMinimumCurrency(profile.constraints?.minimumCompensationCurrency || 'USD');
       setCurrencies((profile.constraints?.allowedCurrencies || ['USD', 'NGN']).join(', '));
     }).catch((e) => setMessage(e.message)).finally(() => setLoading(false));
   }, []);
@@ -56,14 +64,16 @@ export default function OpportunityProfilePage() {
     try {
       const parsedMinimum = minimum.trim() ? Number(minimum) : undefined;
       if (parsedMinimum !== undefined && (!Number.isFinite(parsedMinimum) || parsedMinimum < 0)) throw new Error('Minimum compensation must be a valid non-negative number.');
+      const parsedYears = yearsExperience.trim() ? Number(yearsExperience) : undefined;
+      if (parsedYears !== undefined && (!Number.isFinite(parsedYears) || parsedYears < 0)) throw new Error('Years of experience must be a valid non-negative number.');
       await api.put('/api/opportunity-profile', {
         display_name: name,
         skills: skills.split(',').map((s) => s.trim()).filter(Boolean),
-        experience: {},
-        preferences: { remoteOnly, preferredTypes: preferred },
+        experience: { summary: experienceSummary.trim(), ...(parsedYears === undefined ? {} : { years: parsedYears }) },
+        preferences: { remoteOnly, preferredTypes: preferred, country: country.trim() },
         constraints: {
           blockedTypes: blocked,
-          ...(parsedMinimum === undefined ? {} : { minimumCompensation: parsedMinimum }),
+          ...(parsedMinimum === undefined ? {} : { minimumCompensation: parsedMinimum, minimumCompensationCurrency: minimumCurrency }),
           allowedCurrencies: currencies.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean),
         },
       });
@@ -92,17 +102,24 @@ export default function OpportunityProfilePage() {
             <label className="label mt-4">Skills</label>
             <textarea className="input min-h-28" value={skills} onChange={(e) => setSkills(e.target.value)} placeholder="TypeScript, React, Next.js, API integration, technical writing" />
             <p className="mt-2 text-xs text-ink-muted">Separate skills with commas. Only add skills you can genuinely demonstrate. Matching is based on the skills you enter.</p>
+            <label className="label mt-4">Experience summary</label>
+            <textarea className="input min-h-20" value={experienceSummary} onChange={(e) => setExperienceSummary(e.target.value)} placeholder="Describe projects, products shipped, responsibilities and relevant work experience." />
+            <label className="label mt-4">Years of relevant experience</label>
+            <input className="input" type="number" min="0" value={yearsExperience} onChange={(e) => setYearsExperience(e.target.value)} placeholder="Leave blank if unsure" />
           </section>
           <section className="card p-5">
             <div className="mb-3 text-sm font-semibold text-ink">Work preferences</div>
             <label className="flex items-center gap-2 text-sm text-ink-soft"><input type="checkbox" className="accent-electric" checked={remoteOnly} onChange={(e) => setRemoteOnly(e.target.checked)} /> Prioritize remote opportunities</label>
+            <label className="label mt-4">Country where you can work from</label>
+            <input className="input" value={country} onChange={(e) => setCountry(e.target.value)} placeholder="e.g. Nigeria" />
+            <p className="mt-2 text-xs text-ink-muted">Used to flag listings that state a location restriction. Leave blank if you want location checks disabled.</p>
             <div className="mt-4 text-xs text-ink-muted">Preferred opportunity types</div>
             <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">{TYPES.map(([value, label]) => <label key={value} className="flex items-center gap-2 text-sm text-ink-soft"><input type="checkbox" className="accent-electric" checked={preferred.includes(value)} onChange={() => toggle(preferred, setPreferred, value)} /> {label}</label>)}</div>
           </section>
           <section className="card p-5">
             <div className="mb-3 text-sm font-semibold text-ink">Constraints</div>
             <label className="label">Minimum compensation amount</label>
-            <input className="input" type="number" min="0" value={minimum} onChange={(e) => setMinimum(e.target.value)} placeholder="Leave blank if flexible" />
+            <div className="grid grid-cols-[1fr_120px] gap-2"><input className="input" type="number" min="0" value={minimum} onChange={(e) => setMinimum(e.target.value)} placeholder="Leave blank if flexible" /><select className="input" value={minimumCurrency} onChange={(e) => setMinimumCurrency(e.target.value)}><option value="USD">USD</option><option value="NGN">NGN</option><option value="EUR">EUR</option><option value="GBP">GBP</option></select></div>
             <label className="label mt-4">Accepted currencies</label>
             <input className="input" value={currencies} onChange={(e) => setCurrencies(e.target.value)} placeholder="USD, NGN" />
             <div className="mt-4 text-xs text-ink-muted">Exclude opportunity types</div>
