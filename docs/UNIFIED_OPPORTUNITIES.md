@@ -16,7 +16,10 @@ so the current business research and outreach pipeline continues to work.
   a source explicitly describes them as paid studies.
 - `technical_content`: technical writing and developer documentation roles.
 
-The first discovery adapters cover RemoteOK and Remotive. Listings are classified
+The first discovery adapters cover RemoteOK, Remotive and Hacker News comments.
+Hacker News searches recent comments for explicit freelance, agency, paid research
+and technical writing signals. These are community leads, so they remain partial
+verification and always link to the original comment for human review. Listings are classified
 conservatively. Ambiguous roles remain remote jobs instead of being guessed into
 a more specific category. The current adapters do not claim full coverage of
 every paid research or agency subcontracting marketplace. Additional sources
@@ -27,9 +30,10 @@ should be added only where their public APIs, feeds or usage terms allow it.
 - RemoteOK JSON feed: https://remoteok.com/api
 - RemoteOK API and feed FAQ: https://remoteok.com/faq
 - Remotive public API: https://remotive.com/api/remote-jobs
+- Hacker News Search API: https://hn.algolia.com/api
 - Remotive API terms and usage notes: https://remotive.com/remote-jobs/api
 
-Each listing keeps its original source name and direct source URL. Remotive asks
+Each listing keeps its original source name and direct source URL. Hacker News comments are searched within a 45-day window and must contain both an action signal and a category-specific paid-work signal before ingestion. Remotive asks
 developers to credit Remotive and link to the original listing. Its public API
 documentation recommends no more than four reads per day. The adapter caches
 successful and partial provider runs for six hours. RemoteOK listings also retain
@@ -88,8 +92,10 @@ they are stored. The adapters do not automatically open arbitrary job URLs.
 
 ## Remaining implementation
 
-1. Add source-specific adapters for paid research and agency subcontracting
-   marketplaces after checking API access and reuse terms.
+1. Add direct source-specific adapters for paid research and agency subcontracting
+   marketplaces after checking API access and reuse terms. Current Hacker News
+   discovery provides community leads for these categories, not comprehensive
+   marketplace coverage.
 2. Add source freshness checks, closed-listing detection and evidence review.
 3. Build deeper experience, location, compensation-period and eligibility
    matching.
