@@ -309,9 +309,9 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     const exists = await pool.query('SELECT id FROM opportunity_records WHERE id = $1', [id]);
     if (exists.rowCount === 0) return reply.code(404).send({ error: 'Opportunity not found' });
     const result = await pool.query(
-      \`INSERT INTO opportunity_outcomes (opportunity_id, event_type, notes, metadata, event_at)
+      `INSERT INTO opportunity_outcomes (opportunity_id, event_type, notes, metadata, event_at)
        VALUES ($1, $2, $3, $4::jsonb, COALESCE($5::timestamptz, now()))
-       RETURNING id, opportunity_id, event_type, notes, metadata, event_at, created_at\`,
+       RETURNING id, opportunity_id, event_type, notes, metadata, event_at, created_at`,
       [id, eventType, notes, JSON.stringify(metadata), eventAt]
     );
 
@@ -324,9 +324,9 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     const nextStatus = statusByEvent[eventType];
     if (nextStatus) {
       await pool.query(
-        \`UPDATE opportunity_records SET status = $2,
+        `UPDATE opportunity_records SET status = $2,
          applied_at = CASE WHEN $2 = 'applied' THEN COALESCE(applied_at, $3::timestamptz, now()) ELSE applied_at END,
-         updated_at = now() WHERE id = $1\`,
+         updated_at = now() WHERE id = $1`,
         [id, nextStatus, eventAt]
       );
     }
