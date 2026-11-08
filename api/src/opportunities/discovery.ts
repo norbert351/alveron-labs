@@ -267,7 +267,8 @@ export async function runOpportunityDiscovery() {
   results.push(await ingestProvider('Remotive', async () => {
     const data = await getJson('https://remotive.com/api/remote-jobs?limit=100', 'AlveronLabsOpportunityResearch/1.0 (+https://github.com/norbert351/alveron-labs)');
     if (!Array.isArray(data?.jobs)) throw new Error('Unexpected Remotive response');
-    const jobs = data.jobs as unknown[];\n    return jobs.map((raw) => normalizeRemotive(raw)).filter((job): job is ProviderJob => Boolean(job));
+    const jobs = data.jobs as unknown[];
+    return jobs.map((raw) => normalizeRemotive(raw)).filter((job): job is ProviderJob => Boolean(job));
   }));
   results.push(await importBusinessResearch());
   const totals = results.reduce((acc, item) => ({
