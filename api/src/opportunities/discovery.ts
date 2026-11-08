@@ -48,7 +48,13 @@ export function safeListingUrl(value: unknown, allowedHost: string): string | nu
   } catch { return null; }
 }
 
-function isoDate(value: string | null): string | null {\n  if (!value) return null;\n  const date = new Date(value);\n  return Number.isNaN(date.getTime()) ? null : date.toISOString();\n}\n\nfunction tags(value: unknown): string[] {
+function isoDate(value: string | null): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
+function tags(value: unknown): string[] {
   if (!Array.isArray(value)) return [];
   return value.map((item) => text(item, 80)).filter((item): item is string => Boolean(item)).slice(0, 40);
 }
