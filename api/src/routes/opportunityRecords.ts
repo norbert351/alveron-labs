@@ -58,8 +58,10 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     if (!title || !sourceName || !sourceUrl) return reply.code(400).send({ error: 'title, source_name and a valid HTTP(S) source_url are required' });
 
     const externalId = body.external_id == null ? null : String(body.external_id).slice(0, 240);
-    const dedupeKey = sourceName.toLowerCase() + ':' + (externalId || sourceUrl.toLowerCase());
-    const skills = Array.isArray(body.required_skills) ? body.required_skills : [];
+    const dedupeKey = sourceName.toLowerCase() + ':' + (externalId || sourceUrl);
+    const companyId = body.company_id == null ? null : Number(body.company_id);
+    if (companyId !== null && (!Number.isSafeInteger(companyId) || companyId <= 0)) return reply.code(400).send({ error: 'Invalid company_id' });
+    const skills = Array.isArray(body.required_skills) ? body.required_skills.slice(0, 100) : [];
     const evidence = Array.isArray(body.evidence) ? body.evidence : [];
     const min = body.compensation_min == null ? null : Number(body.compensation_min);
     const max = body.compensation_max == null ? null : Number(body.compensation_max);
@@ -85,7 +87,7 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
         type, sourceName, sourceUrl, externalId, dedupeKey, title,
         body.description == null ? null : String(body.description).slice(0, 12000),
         body.organization_name == null ? null : String(body.organization_name).slice(0, 240),
-        body.company_id == null ? null : Number(body.company_id),
+        companyId,
         body.location == null ? null : String(body.location).slice(0, 240),
         body.is_remote === true,
         body.employment_type == null ? null : String(body.employment_type).slice(0, 80),
