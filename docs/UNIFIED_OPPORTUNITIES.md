@@ -22,10 +22,19 @@ research and outreach pipeline continues to work.
   external id, or source plus URL when no external id exists, is deduplicated.
 - `PATCH /api/opportunity-records/:id`: update review status, verification
   status or fit score.
+- `GET /api/opportunity-profile`: read the primary skills and preferences profile.
+- `PUT /api/opportunity-profile`: save skills, experience, preferences and constraints.
+- `POST /api/opportunity-records/:id/score`: calculate and store an explainable
+  match score from skill coverage and configured profile preferences/constraints.
 
-All routes use the existing API authentication layer. Creating a record never
-contacts a third party or submits an application. Approval and external actions
-remain separate human-controlled steps.
+The initial matcher reports matched and missing skills, applies explicit
+remote/type preferences and supported constraints (`blockedTypes`,
+`minimumCompensation`, `allowedCurrencies`). It does not infer experience
+seniority or claim that a person is qualified based on skill-name overlap alone.
+All routes use the existing API authentication layer.
+
+Creating a record or scoring it never contacts a third party or submits an
+application. Approval and external actions remain separate human-controlled steps.
 
 ## Data safety
 
@@ -34,10 +43,12 @@ It does not rewrite or delete existing opportunity data. The API uses parameteri
 queries, validates source URLs as HTTP(S), constrains enum-like fields and caps
 list page sizes. Source URL validation does not fetch the URL.
 
-## Next steps
+## Remaining implementation
 
 1. Add and test discovery adapters for each source channel.
-2. Build profile editing and transparent skills/constraint matching.
-3. Add verification and freshness checks with source evidence.
-4. Add review queue and explicit approval gates for applications and outreach.
-5. Add scheduled discovery and outcome tracking.
+2. Add verification and freshness checks with source evidence.
+3. Build the unified dashboard and review queue.
+4. Add explicit approval gates for applications and outreach.
+5. Add scheduled discovery, deadline notifications and outcome tracking.
+6. Add Drizzle ORM and typed schemas incrementally while retaining PostgreSQL
+   and validating compatibility with the current `pg` queries.
