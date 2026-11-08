@@ -18,8 +18,6 @@ jobs:
   api:
     name: API typecheck and unit tests
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     defaults:
       run:
         working-directory: api
@@ -30,27 +28,11 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: api/package-lock.json
-      - name: Sync API package lock
-        run: npm install --package-lock-only --ignore-scripts
       - run: npm ci
       - name: TypeScript build
         run: npm run build
       - name: Unit and schema tests
         run: npm run test:unit
-
-      - name: Commit generated API lockfile on feature branch
-        if: github.event_name == 'push' && github.ref == 'refs/heads/feat/unified-opportunity-engine'
-        working-directory: .
-        run: |
-          if git diff --quiet -- api/package-lock.json; then
-            echo "API lockfile already current"
-            exit 0
-          fi
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add api/package-lock.json
-          git commit -m "chore(api): sync Drizzle dependency lockfile"
-          git push origin HEAD:feat/unified-opportunity-engine
 
   web:
     name: Dashboard typecheck and production build
@@ -98,8 +80,6 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: api/package-lock.json
-      - name: Sync API package lock
-        run: npm install --package-lock-only --ignore-scripts
       - run: npm ci
       - name: Create isolated CI environment
         run: |
