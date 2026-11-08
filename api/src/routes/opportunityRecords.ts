@@ -3,7 +3,7 @@ import { pool, logActivity } from '../db.ts';
 import { listOpportunitySourceRuns, runOpportunityDiscovery } from '../opportunities/discovery.ts';
 import { eq } from 'drizzle-orm';
 import { orm } from '../db/drizzle.ts';
-import { opportunityProfiles, opportunityRecords } from '../db/drizzle-schema.ts';
+import { opportunityProfiles } from '../db/drizzle-schema.ts';
 
 const TYPES = new Set(['remote_job', 'paid_task', 'agency_contract', 'business_lead', 'paid_research', 'technical_content']);
 const STATUSES = new Set(['discovered', 'reviewing', 'qualified', 'approved', 'rejected', 'applied', 'closed', 'expired']);
