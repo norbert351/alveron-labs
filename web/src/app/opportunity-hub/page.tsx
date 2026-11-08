@@ -7,7 +7,9 @@ import { api } from '@/lib/api';
 
 type OpportunityType = 'remote_job' | 'paid_task' | 'agency_contract' | 'business_lead' | 'paid_research' | 'technical_content';
 type OpportunityStatus = 'discovered' | 'reviewing' | 'qualified' | 'approved' | 'rejected' | 'applied' | 'closed' | 'expired';
-interface DiscoveryRun { id: number; source_name: string; opportunity_type: string; status: string; discovered_count: number; new_count: number; duplicate_count: number; error: string | null; created_at: string; completed_at: string | null; }\n\ninterface OpportunityRecord {
+interface DiscoveryRun { id: number; source_name: string; opportunity_type: string; status: string; discovered_count: number; new_count: number; duplicate_count: number; error: string | null; created_at: string; completed_at: string | null; }
+
+interface OpportunityRecord {
   id: number;
   opportunity_type: OpportunityType;
   source_name: string;
@@ -72,10 +74,12 @@ export default function OpportunityHubPage() {
       if (status) params.set('status', status);
       if (search.trim()) params.set('search', search.trim());
       params.set('limit', '100');
-      const result = await api.get<{ opportunities: OpportunityRecord[] }>(
-        '/api/opportunity-records?' + params.toString()
-      );
+      const [result, runResult] = await Promise.all([
+        api.get<{ opportunities: OpportunityRecord[] }>('/api/opportunity-records?' + params.toString()),
+        api.get<{ runs: DiscoveryRun[] }>('/api/opportunity-discovery/runs?limit=5'),
+      ]);
       setItems(result.opportunities || []);
+      setRuns(runResult.runs || []);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not load opportunities');
     } finally {
