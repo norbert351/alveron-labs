@@ -237,7 +237,7 @@ async function ingestProvider(
        new_count=$4, duplicate_count=$5, completed_at=now() WHERE id=$1`,
       [runId, status, fetched, inserted, duplicates]
     );
-    return { source, status, fetched, inserted, duplicates };
+    return { source: sourceName, status, fetched, inserted, duplicates };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown provider error';
     await pool.query(
