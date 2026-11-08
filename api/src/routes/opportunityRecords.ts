@@ -254,8 +254,11 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     const candidateCountry = String(preferences.country || '').trim().toLowerCase();
     const opportunityLocation = String(opportunity.location || '').trim().toLowerCase();
     const locationIsBroad = /worldwide|anywhere|global|all locations|africa|emea|americas|europe|asia pacific/.test(opportunityLocation);
-    if (candidateCountry && opportunityLocation && !locationIsBroad && !opportunityLocation.includes(candidateCountry)) {\n      score = 0;\n      reasons.push('Location may be restricted to ' + String(opportunity.location) + ', which does not explicitly include ' + String(preferences.country));
-    }\n    const allowedCurrencies = Array.isArray(constraints.allowedCurrencies) ? constraints.allowedCurrencies.map((currency: unknown) => String(currency).toUpperCase()) : [];
+    if (candidateCountry && opportunityLocation && !locationIsBroad && !opportunityLocation.includes(candidateCountry)) {
+      score = 0;
+      reasons.push('Location may be restricted to ' + String(opportunity.location) + ', which does not explicitly include ' + String(preferences.country));
+    }
+    const allowedCurrencies = Array.isArray(constraints.allowedCurrencies) ? constraints.allowedCurrencies.map((currency: unknown) => String(currency).toUpperCase()) : [];
     if (allowedCurrencies.length > 0 && opportunity.compensation_currency && !allowedCurrencies.includes(String(opportunity.compensation_currency).toUpperCase())) {
       score = 0;
       reasons.push('Constraint: compensation currency is outside your allowed currencies');
