@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 
 import { classifyOpportunityType, normalizeRemotive, normalizeRemoteOk, safeListingUrl, salaryRange } from '../src/opportunities/discovery.ts';
 
-const migration = readFileSync(
+const sourceRunMigration = readFileSync(\n  new URL('../src/db/migrations/007_opportunity_source_runs.sql', import.meta.url),\n  'utf8'\n);\n\nconst migration = readFileSync(
   new URL('../src/db/migrations/006_unified_opportunities.sql', import.meta.url),
   'utf8'
 );
@@ -101,4 +101,11 @@ test('provider classifier defaults ambiguous roles to remote jobs', () => {
   });
   assert.ok(job);
   assert.equal(classifyOpportunityType(job), 'remote_job');
+});
+
+test('source run migration adds nullable lineage without rewriting existing data', () => {
+  assert.match(sourceRunMigration, /ADD COLUMN IF NOT EXISTS source_run_id/i);
+  assert.match(sourceRunMigration, /REFERENCES opportunity_source_runs\(id\) ON DELETE SET NULL/i);
+  assert.match(sourceRunMigration, /CREATE INDEX IF NOT EXISTS/i);
+  assert.doesNotMatch(sourceRunMigration, /\bDROP\s+(TABLE|COLUMN|INDEX)\b/i);
 });
