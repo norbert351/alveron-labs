@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { pool, logActivity } from '../db.ts';
+import { listOpportunitySourceRuns, runOpportunityDiscovery } from '../opportunities/discovery.ts';
 
 const TYPES = new Set(['remote_job', 'paid_task', 'agency_contract', 'business_lead', 'paid_research', 'technical_content']);
 const STATUSES = new Set(['discovered', 'reviewing', 'qualified', 'approved', 'rejected', 'applied', 'closed', 'expired']);
@@ -13,7 +14,35 @@ function safeHttpUrl(value: unknown): string | null {
   } catch { return null; }
 }
 
+let discoveryInProgress = false;
+
 export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
+  app.get('/api/opportunity-discovery/runs', async (req, reply) => {
+    const query = req.query as Record<string, string | undefined>;
+    const runs = await listOpportunitySourceRuns(Number(query.limit) || 20);
+    return reply.send({ runs });
+  });
+
+  const startDiscovery = async (reply: any) => {
+    if (discoveryInProgress) return reply.code(409).send({ error: 'Opportunity discovery is already running' });
+    discoveryInProgress = true;
+    try {
+      const result = await runOpportunityDiscovery();
+      await logActivity({
+        actor: 'opportunity_discovery',
+        action: 'opportunity_discovery_completed',
+        entityType: 'opportunity_source_run',
+        detail: result.totals,
+      });
+      return reply.send(result);
+    } finally {
+      discoveryInProgress = false;
+    }
+  };
+
+  app.post('/api/opportunity-discovery/run', async (_req, reply) => startDiscovery(reply));
+  app.post('/api/webhook/opportunity-discovery', async (_req, reply) => startDiscovery(reply));
+
   app.get('/api/opportunity-records', async (req, reply) => {
     const query = req.query as Record<string, string | undefined>;
     const conditions: string[] = [];
