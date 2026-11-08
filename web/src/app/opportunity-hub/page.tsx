@@ -30,6 +30,8 @@ interface OpportunityRecord {
   verification_status: string;
   status: OpportunityStatus;
   discovered_at: string;
+  latest_outcome_type?: string | null;
+  latest_outcome_at?: string | null;
   qualification?: { match?: { matched_skills?: string[]; missing_skills?: string[]; reasons?: string[] } };
 }
 
@@ -62,6 +64,7 @@ export default function OpportunityHubPage() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<number | null>(null);
   const [discoveryBusy, setDiscoveryBusy] = useState(false);
+  const [outcomeDrafts, setOutcomeDrafts] = useState<Record<number, { event_type: string; notes: string }>>({});
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
 
@@ -107,6 +110,34 @@ export default function OpportunityHubPage() {
       setError(e instanceof Error ? e.message : 'Discovery could not run');
     } finally {
       setDiscoveryBusy(false);
+    }
+  }
+
+
+  function updateOutcomeDraft(id: number, field: 'event_type' | 'notes', value: string) {
+    setOutcomeDrafts((current) => ({
+      ...current,
+      [id]: { event_type: current[id]?.event_type || 'follow_up', notes: current[id]?.notes || '', [field]: value },
+    }));
+  }
+
+  async function recordOutcome(id: number) {
+    const draft = outcomeDrafts[id] || { event_type: 'follow_up', notes: '' };
+    setBusy(id);
+    setError('');
+    setNotice('');
+    try {
+      await api.post('/api/opportunity-records/' + id + '/outcomes', {
+        event_type: draft.event_type,
+        notes: draft.notes,
+      });
+      setNotice('Progress recorded.');
+      setOutcomeDrafts((current) => ({ ...current, [id]: { event_type: 'follow_up', notes: '' } }));
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not record this outcome');
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -238,6 +269,7 @@ export default function OpportunityHubPage() {
                   <span>{money(o)}</span>
                   {o.deadline_at && <span>Deadline {new Date(o.deadline_at).toLocaleDateString()}</span>}
                   <span>Found {new Date(o.discovered_at).toLocaleDateString()}</span>
+                  {o.latest_outcome_type && <span>Latest progress: {o.latest_outcome_type.replaceAll('_', ' ')}{o.latest_outcome_at ? ' · ' + new Date(o.latest_outcome_at).toLocaleDateString() : ''}</span>}
                 </div>
                 {o.required_skills?.length > 0 && <div className="mt-3 flex flex-wrap gap-1.5">{o.required_skills.map((skill) => <span key={skill} className="rounded-md bg-obsidian-raised px-2 py-1 text-[11px] text-ink-soft">{skill}</span>)}</div>}
                 {match && <div className="mt-3 rounded-lg bg-obsidian-raised/70 p-3 text-xs text-ink-soft">
@@ -254,6 +286,29 @@ export default function OpportunityHubPage() {
                     {STATUSES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
                   </select>
                 </div>
+
+                <details className="mt-3 border-t border-obsidian-border pt-3">
+                  <summary className="cursor-pointer text-xs font-medium text-electric-bright">Record review or application progress</summary>
+                  <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[190px_1fr_auto]">
+                    <select className="input text-xs" value={outcomeDrafts[o.id]?.event_type || 'follow_up'} onChange={(e) => updateOutcomeDraft(o.id, 'event_type', e.target.value)}>
+                      <option value="reviewed">Reviewed</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                      <option value="applied">Applied</option>
+                      <option value="response_received">Response received</option>
+                      <option value="interview">Interview</option>
+                      <option value="offer">Offer</option>
+                      <option value="won">Won</option>
+                      <option value="lost">Lost</option>
+                      <option value="no_response">No response</option>
+                      <option value="follow_up">Follow-up</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                    <input className="input text-xs" value={outcomeDrafts[o.id]?.notes || ''} onChange={(e) => updateOutcomeDraft(o.id, 'notes', e.target.value)} placeholder="Optional notes, response details or next step" />
+                    <button className="btn-ghost text-xs" onClick={() => void recordOutcome(o.id)} disabled={busy !== null}>{busy === o.id ? 'Saving…' : 'Save progress'}</button>
+                  </div>
+                  <p className="mt-2 text-[10px] text-ink-muted">This only records your progress. It never submits an application or contacts anyone.</p>
+                </details>
               </article>
             );
           })}
