@@ -52,3 +52,57 @@ jobs:
         run: npx tsc --noEmit
       - name: Next.js production build
         run: npm run build
+
+  integration:
+    name: Opportunity engine PostgreSQL integration tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: alveron
+          POSTGRES_PASSWORD: alveron_ci_pw
+          POSTGRES_DB: alveron_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U alveron -d alveron_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    defaults:
+      run:
+        working-directory: api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: api/package-lock.json
+      - run: npm ci
+      - name: Create isolated CI environment
+        run: |
+          cat > .env <<'EOF'
+          ALVERON_PORT=3100
+          ALVERON_DATABASE_URL=postgres://alveron:alveron_ci_pw@127.0.0.1:5432/alveron_ci
+          ALVERON_INTERNAL_TOKEN=ci-internal-token
+          ALVERON_WEBHOOK_TOKEN=ci-webhook-token
+          ENCRYPTION_KEY=MDEyMzQ1Njc4OTAxMjM0NTY3ODkwMTIzNDU2Nzg5MDE=
+          EOF
+      - name: Start API and wait for migrations
+        run: |
+          npm run start > /tmp/alveron-api.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent http://127.0.0.1:3100/api/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+          cat /tmp/alveron-api.log
+          exit 1
+      - name: Run database-backed opportunity tests
+        run: npm run test:integration:ci
+      - name: API startup logs
+        if: always()
+        run: cat /tmp/alveron-api.log || true
