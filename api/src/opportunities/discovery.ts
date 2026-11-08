@@ -39,7 +39,7 @@ function text(value: unknown, max = 12000): string | null {
   return cleaned ? cleaned.slice(0, max) : null;
 }
 
-function safeListingUrl(value: unknown, allowedHost: string): string | null {
+export function safeListingUrl(value: unknown, allowedHost: string): string | null {
   if (typeof value !== 'string') return null;
   try {
     const url = new URL(value);
@@ -53,7 +53,7 @@ function tags(value: unknown): string[] {
   return value.map((item) => text(item, 80)).filter((item): item is string => Boolean(item)).slice(0, 40);
 }
 
-function salaryRange(value: unknown): { min: number | null; max: number | null; currency: string | null } {
+export function salaryRange(value: unknown): { min: number | null; max: number | null; currency: string | null } {
   if (typeof value === 'number' && Number.isFinite(value)) return { min: value, max: value, currency: 'USD' };
   if (typeof value !== 'string') return { min: null, max: null, currency: null };
   const currency = /\bNGN\b|₦/i.test(value) ? 'NGN' : /\bEUR\b|€/i.test(value) ? 'EUR' : /\bGBP\b|£/i.test(value) ? 'GBP' : /\$|\bUSD\b/i.test(value) ? 'USD' : null;
@@ -61,7 +61,7 @@ function salaryRange(value: unknown): { min: number | null; max: number | null; 
   return { min: numbers.length ? Math.min(...numbers) : null, max: numbers.length ? Math.max(...numbers) : null, currency };
 }
 
-function classify(job: ProviderJob): 'remote_job' | 'paid_task' | 'agency_contract' | 'paid_research' | 'technical_content' {
+export function classifyOpportunityType(job: ProviderJob): 'remote_job' | 'paid_task' | 'agency_contract' | 'paid_research' | 'technical_content' {
   const title = job.title.toLowerCase();
   const body = (job.description || '').slice(0, 3000).toLowerCase();
   const combined = title + ' ' + body;
@@ -72,7 +72,7 @@ function classify(job: ProviderJob): 'remote_job' | 'paid_task' | 'agency_contra
   return 'remote_job';
 }
 
-function normalizeRemoteOk(raw: any): ProviderJob | null {
+export function normalizeRemoteOk(raw: any): ProviderJob | null {
   const url = safeListingUrl(raw?.url, 'remoteok.com');
   const id = raw?.id == null ? null : String(raw.id);
   const title = text(raw?.position, 300);
@@ -92,7 +92,7 @@ function normalizeRemoteOk(raw: any): ProviderJob | null {
   };
 }
 
-function normalizeRemotive(raw: any): ProviderJob | null {
+export function normalizeRemotive(raw: any): ProviderJob | null {
   const url = safeListingUrl(raw?.url, 'remotive.com');
   const id = raw?.id == null ? null : String(raw.id);
   const title = text(raw?.title, 300);
@@ -148,7 +148,7 @@ async function ingestProvider(
     const jobs = await fetchJobs();
     fetched = jobs.length;
     for (const job of jobs) {
-      const type = classify(job);
+      const type = classifyOpportunityType(job);
       const dedupeKey = source.toLowerCase() + ':' + job.id;
       const result = await pool.query(
         `INSERT INTO opportunity_records (
