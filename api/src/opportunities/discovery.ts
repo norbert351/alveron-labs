@@ -191,7 +191,7 @@ async function ingestProvider(
   source: ProviderJob['source'],
   fetchJobs: () => Promise<ProviderJob[]>,
   opportunityType: 'remote_job' | 'paid_task' | 'agency_contract' | 'paid_research' | 'technical_content' = 'remote_job',
-  sourceName = source,
+  sourceName: string = source,
   query: Record<string, unknown> = {}
 ): Promise<ProviderResult> {
   if (await recentRun(sourceName)) return { source: sourceName, status: 'cached', fetched: 0, inserted: 0, duplicates: 0, skipped: true };
