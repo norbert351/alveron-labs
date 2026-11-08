@@ -15,7 +15,10 @@ type ProviderJob = {
   deadline: string | null;
   publishedAt: string | null;
   tags: string[];
-  source: 'RemoteOK' | 'Remotive';
+  source: 'RemoteOK' | 'Remotive' | 'Hacker News';
+  isRemote: boolean;
+  forcedType?: 'remote_job' | 'paid_task' | 'agency_contract' | 'paid_research' | 'technical_content';
+  sourceEvidence?: Array<{ url: string; text: string; type: string }>;
 };
 
 type ProviderResult = { source: string; status: string; fetched: number; inserted: number; duplicates: number; error?: string; skipped?: boolean };
@@ -68,6 +71,7 @@ export function salaryRange(value: unknown): { min: number | null; max: number |
 }
 
 export function classifyOpportunityType(job: ProviderJob): 'remote_job' | 'paid_task' | 'agency_contract' | 'paid_research' | 'technical_content' {
+  if (job.forcedType) return job.forcedType;
   const title = job.title.toLowerCase();
   const body = (job.description || '').slice(0, 3000).toLowerCase();
   const combined = title + ' ' + body;
@@ -94,7 +98,7 @@ export function normalizeRemoteOk(raw: any): ProviderJob | null {
     salaryMax: Number.isFinite(salaryMax) && salaryMax > 0 ? salaryMax : null,
     currency: salaryMin > 0 || salaryMax > 0 ? 'USD' : null,
     deadline: null, publishedAt: text(raw.date, 80),
-    tags: tags(raw.tags), source: 'RemoteOK',
+    tags: tags(raw.tags), source: 'RemoteOK', isRemote: true,
   };
 }
 
@@ -111,7 +115,54 @@ export function normalizeRemotive(raw: any): ProviderJob | null {
     salaryMin: salary.min, salaryMax: salary.max, currency: salary.currency,
     deadline: null, publishedAt: text(raw.publication_date, 80),
     tags: [text(raw.category, 80), ...tags(raw.tags)].filter((item): item is string => Boolean(item)),
-    source: 'Remotive',
+    source: 'Remotive', isRemote: true,
+  };
+}
+
+
+const HN_SKILLS = [
+  'TypeScript', 'JavaScript', 'React', 'Next.js', 'Node.js', 'Python',
+  'PostgreSQL', 'SQL', 'MySQL', 'Docker', 'AWS', 'Go', 'Rust', 'Java',
+  'C#', 'PHP', 'Ruby', 'Kubernetes', 'GraphQL', 'Fastify', 'NestJS',
+];
+
+export function normalizeHackerNews(
+  raw: any,
+  opportunityType: 'paid_task' | 'agency_contract' | 'paid_research' | 'technical_content'
+): ProviderJob | null {
+  const id = raw?.objectID == null ? null : String(raw.objectID);
+  const comment = text(raw?.comment_text, 12000);
+  if (!id || !comment) return null;
+  const actionSignal = /\b(hiring|looking for|seeking|need(?:s)? a|we need|we are looking|we're looking|paying|budget for|contractor wanted|open role|work with)\b/i.test(comment);
+  const categorySignals: Record<typeof opportunityType, RegExp> = {
+    paid_task: /\b(freelance|contract|fixed[- ]scope|project[- ]based|paid task|hourly)\b/i,
+    agency_contract: /\b(subcontract|white[- ]label|agency partner|overflow work|delivery partner)\b/i,
+    paid_research: /\b(paid (?:user )?research|paid (?:user )?study|research participant|user study participant)\b/i,
+    technical_content: /\b(technical writer|developer writer|documentation writer|developer docs|technical content)\b/i,
+  };
+  if (!actionSignal || !categorySignals[opportunityType].test(comment)) return null;
+  const url = safeListingUrl('https://news.ycombinator.com/item?id=' + encodeURIComponent(id), 'news.ycombinator.com');
+  if (!url) return null;
+  const storyTitle = text(raw?.story_title, 180);
+  const firstSentence = comment.split(/(?<=[.!?])\s+/)[0]?.slice(0, 150) || comment.slice(0, 150);
+  const title = [storyTitle, firstSentence].filter(Boolean).join(' | ').slice(0, 300);
+  const lowerComment = comment.toLowerCase();
+  const foundSkills = HN_SKILLS.filter((skill) => lowerComment.includes(skill.toLowerCase()));
+  const author = text(raw?.author, 120);
+  return {
+    id, title, company: null, url, description: comment,
+    location: null,
+    employmentType: /\b(contract|freelance|part.time|full.time)\b/i.test(comment) ? 'contract' : null,
+    salary: null, salaryMin: null, salaryMax: null, currency: null,
+    deadline: null, publishedAt: text(raw?.created_at, 80),
+    tags: foundSkills, source: 'Hacker News',
+    isRemote: /\b(remote|worldwide|anywhere|distributed)\b/i.test(comment),
+    forcedType: opportunityType,
+    sourceEvidence: [{
+      url,
+      text: 'Hacker News comment by ' + (author || 'unknown author') + (storyTitle ? ' in ' + storyTitle : '') + '. Original comment retained for human review.',
+      type: 'community_comment',
+    }],
   };
 }
 
@@ -137,14 +188,17 @@ async function recentRun(source: string): Promise<boolean> {
 }
 
 async function ingestProvider(
-  source: 'RemoteOK' | 'Remotive',
-  fetchJobs: () => Promise<ProviderJob[]>
+  source: ProviderJob['source'],
+  fetchJobs: () => Promise<ProviderJob[]>,
+  opportunityType: 'remote_job' | 'paid_task' | 'agency_contract' | 'paid_research' | 'technical_content' = 'remote_job',
+  sourceName = source,
+  query: Record<string, unknown> = {}
 ): Promise<ProviderResult> {
-  if (await recentRun(source)) return { source, status: 'cached', fetched: 0, inserted: 0, duplicates: 0, skipped: true };
+  if (await recentRun(sourceName)) return { source: sourceName, status: 'cached', fetched: 0, inserted: 0, duplicates: 0, skipped: true };
   const run = await pool.query(
-    `INSERT INTO opportunity_source_runs (source_name, opportunity_type, status, started_at)
-     VALUES ($1, 'remote_job', 'running', now()) RETURNING id`,
-    [source]
+    `INSERT INTO opportunity_source_runs (source_name, opportunity_type, query, status, started_at)
+     VALUES ($1, $2, $3::jsonb, 'running', now()) RETURNING id`,
+    [sourceName, opportunityType, JSON.stringify(query)]
   );
   const runId = Number(run.rows[0].id);
   let fetched = 0;
@@ -163,14 +217,14 @@ async function ingestProvider(
           compensation_min, compensation_max, compensation_currency, required_skills,
           evidence, verification_status, discovered_at, source_run_id
         ) VALUES (
-          $1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,$11,$12,$13,$14::jsonb,
-          $15::jsonb,'partial',COALESCE($16::timestamptz,now()),$17
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15::jsonb,
+          $16::jsonb,'partial',COALESCE($17::timestamptz,now()),$18
         ) ON CONFLICT (dedupe_key) DO NOTHING RETURNING id`,
         [
-          type, source, job.url, job.id, dedupeKey, job.title, job.description,
-          job.company, job.location, job.employmentType, job.salaryMin, job.salaryMax,
+          type, sourceName, job.url, job.id, dedupeKey, job.title, job.description,
+          job.company, job.location, job.isRemote, job.employmentType, job.salaryMin, job.salaryMax,
           job.currency, JSON.stringify(job.tags),
-          JSON.stringify([{ url: job.url, text: 'Original listing supplied by ' + source, type: 'source_listing' }]),
+          JSON.stringify(job.sourceEvidence || [{ url: job.url, text: 'Original listing supplied by ' + source, type: 'source_listing' }]),
           isoDate(job.publishedAt), runId,
         ]
       );
@@ -191,7 +245,7 @@ async function ingestProvider(
        new_count=$3, duplicate_count=$4, error=$5, completed_at=now() WHERE id=$1`,
       [runId, fetched, inserted, duplicates, message.slice(0, 1000)]
     );
-    return { source, status: 'failed', fetched, inserted, duplicates, error: message };
+    return { source: sourceName, status: 'failed', fetched, inserted, duplicates, error: message };
   }
 }
 
@@ -270,6 +324,29 @@ export async function runOpportunityDiscovery() {
     const jobs = data.jobs as unknown[];
     return jobs.map((raw) => normalizeRemotive(raw)).filter((job): job is ProviderJob => Boolean(job));
   }));
+  const hnSince = Math.floor((Date.now() - 45 * 24 * 60 * 60 * 1000) / 1000);
+  const hnQueries: Array<{ type: 'paid_task' | 'agency_contract' | 'paid_research' | 'technical_content'; query: string }> = [
+    { type: 'paid_task', query: 'freelance developer contract' },
+    { type: 'agency_contract', query: 'agency subcontract white label' },
+    { type: 'paid_research', query: 'paid research participant user study' },
+    { type: 'technical_content', query: 'technical writer developer documentation contract' },
+  ];
+  for (const item of hnQueries) {
+    const sourceName = 'Hacker News / ' + item.type;
+    results.push(await ingestProvider('Hacker News', async () => {
+      const params = new URLSearchParams({
+        query: item.query,
+        tags: 'comment',
+        numericFilters: 'created_at_i>' + hnSince,
+        hitsPerPage: '50',
+        page: '0',
+      });
+      const data = await getJson('https://hn.algolia.com/api/v1/search_by_date?' + params.toString(), 'AlveronLabsOpportunityResearch/1.0 (+https://github.com/norbert351/alveron-labs)');
+      if (!Array.isArray(data?.hits)) throw new Error('Unexpected Hacker News Search response');
+      const hits = data.hits as unknown[];
+      return hits.map((raw) => normalizeHackerNews(raw, item.type)).filter((job): job is ProviderJob => Boolean(job));
+    }, item.type, sourceName, { query: item.query, window_days: 45 }));
+  }
   results.push(await importBusinessResearch());
   const totals = results.reduce((acc, item) => ({
     fetched: acc.fetched + item.fetched,
