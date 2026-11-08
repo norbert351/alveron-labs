@@ -143,12 +143,19 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
   });
 
   app.get('/api/opportunity-profile', async (_req, reply) => {
-    const result = await pool.query(
-      `SELECT profile_key, display_name, skills, experience, preferences, constraints, active, updated_at
-       FROM opportunity_profiles WHERE profile_key = 'primary' LIMIT 1`
-    );
+    const [row] = await orm.select().from(opportunityProfiles)
+      .where(eq(opportunityProfiles.profileKey, 'primary')).limit(1);
     return reply.send({
-      profile: result.rows[0] || {
+      profile: row ? {
+        profile_key: row.profileKey,
+        display_name: row.displayName,
+        skills: row.skills,
+        experience: row.experience,
+        preferences: row.preferences,
+        constraints: row.constraints,
+        active: row.active,
+        updated_at: row.updatedAt,
+      } : {
         profile_key: 'primary', display_name: 'Primary profile',
         skills: [], experience: {}, preferences: {}, constraints: {}, active: true,
       },
@@ -169,27 +176,32 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     if (body.preferences != null && !isObject(body.preferences)) return reply.code(400).send({ error: 'preferences must be an object' });
     if (body.constraints != null && !isObject(body.constraints)) return reply.code(400).send({ error: 'constraints must be an object' });
     const displayName = String(body.display_name || 'Primary profile').trim().slice(0, 120) || 'Primary profile';
-    const result = await pool.query(
-      `INSERT INTO opportunity_profiles (profile_key, display_name, skills, experience, preferences, constraints, active)
-       VALUES ('primary', $1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, true)
-       ON CONFLICT (profile_key) DO UPDATE SET
-         display_name = EXCLUDED.display_name,
-         skills = EXCLUDED.skills,
-         experience = EXCLUDED.experience,
-         preferences = EXCLUDED.preferences,
-         constraints = EXCLUDED.constraints,
-         active = true,
-         updated_at = now()
-       RETURNING profile_key, display_name, skills, experience, preferences, constraints, active, updated_at`,
-      [
-        displayName, JSON.stringify(skills),
-        JSON.stringify(isObject(body.experience) ? body.experience : {}),
-        JSON.stringify(isObject(body.preferences) ? body.preferences : {}),
-        JSON.stringify(isObject(body.constraints) ? body.constraints : {}),
-      ]
-    );
+    const experience = isObject(body.experience) ? body.experience : {};
+    const preferences = isObject(body.preferences) ? body.preferences : {};
+    const constraints = isObject(body.constraints) ? body.constraints : {};
+    const [row] = await orm.insert(opportunityProfiles).values({
+      profileKey: 'primary',
+      displayName,
+      skills,
+      experience,
+      preferences,
+      constraints,
+      active: true,
+    }).onConflictDoUpdate({
+      target: opportunityProfiles.profileKey,
+      set: { displayName, skills, experience, preferences, constraints, active: true, updatedAt: new Date() },
+    }).returning();
     await logActivity({ actor: 'dashboard', action: 'opportunity_profile_updated', entityType: 'opportunity_profile', detail: { skill_count: skills.length } });
-    return reply.send({ profile: result.rows[0] });
+    return reply.send({ profile: {
+      profile_key: row.profileKey,
+      display_name: row.displayName,
+      skills: row.skills,
+      experience: row.experience,
+      preferences: row.preferences,
+      constraints: row.constraints,
+      active: row.active,
+      updated_at: row.updatedAt,
+    } });
   });
 
   app.post('/api/opportunity-records/:id/score', async (req, reply) => {
