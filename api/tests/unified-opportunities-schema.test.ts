@@ -150,3 +150,16 @@ test('Hacker News paid research comments are classified only with paid-study evi
     comment_text: 'We are looking for a research analyst to join our team.',
   }, 'paid_research'), null);
 });
+
+test('opportunity outcome migration stores a durable human event history', () => {
+  const outcomes = readFileSync(
+    new URL('../src/db/migrations/008_opportunity_outcomes.sql', import.meta.url),
+    'utf8'
+  );
+  assert.match(outcomes, /CREATE TABLE IF NOT EXISTS opportunity_outcomes/i);
+  assert.match(outcomes, /REFERENCES opportunity_records\(id\) ON DELETE CASCADE/i);
+  for (const event of ['approved', 'rejected', 'applied', 'interview', 'offer', 'won', 'lost', 'no_response', 'follow_up']) {
+    assert.ok(outcomes.includes("'" + event + "'"), 'missing outcome event: ' + event);
+  }
+  assert.doesNotMatch(outcomes, /\bDROP\s+(TABLE|COLUMN|INDEX)\b/i);
+});
