@@ -109,6 +109,102 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     return reply.code(201).send({ opportunity });
   });
 
+  app.get('/api/opportunity-profile', async (_req, reply) => {
+    const result = await pool.query(
+      `SELECT profile_key, display_name, skills, experience, preferences, constraints, active, updated_at
+       FROM opportunity_profiles WHERE profile_key = 'primary' LIMIT 1`
+    );
+    return reply.send({
+      profile: result.rows[0] || {
+        profile_key: 'primary', display_name: 'Primary profile',
+        skills: [], experience: {}, preferences: {}, constraints: {}, active: true,
+      },
+    });
+  });
+
+  app.put('/api/opportunity-profile', async (req, reply) => {
+    const body = (req.body || {}) as Record<string, unknown>;
+    const isObject = (value: unknown): value is Record<string, unknown> =>
+      Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+    const skills = Array.isArray(body.skills)
+      ? body.skills.filter((skill): skill is string => typeof skill === 'string').map((skill) => skill.trim()).filter(Boolean).slice(0, 100)
+      : [];
+    if (body.skills != null && !Array.isArray(body.skills)) {
+      return reply.code(400).send({ error: 'skills must be an array of strings' });
+    }
+    if (body.experience != null && !isObject(body.experience)) return reply.code(400).send({ error: 'experience must be an object' });
+    if (body.preferences != null && !isObject(body.preferences)) return reply.code(400).send({ error: 'preferences must be an object' });
+    if (body.constraints != null && !isObject(body.constraints)) return reply.code(400).send({ error: 'constraints must be an object' });
+    const displayName = String(body.display_name || 'Primary profile').trim().slice(0, 120) || 'Primary profile';
+    const result = await pool.query(
+      `INSERT INTO opportunity_profiles (profile_key, display_name, skills, experience, preferences, constraints, active)
+       VALUES ('primary', $1, $2::jsonb, $3::jsonb, $4::jsonb, $5::jsonb, true)
+       ON CONFLICT (profile_key) DO UPDATE SET
+         display_name = EXCLUDED.display_name,
+         skills = EXCLUDED.skills,
+         experience = EXCLUDED.experience,
+         preferences = EXCLUDED.preferences,
+         constraints = EXCLUDED.constraints,
+         active = true,
+         updated_at = now()
+       RETURNING profile_key, display_name, skills, experience, preferences, constraints, active, updated_at`,
+      [
+        displayName, JSON.stringify(skills),
+        JSON.stringify(isObject(body.experience) ? body.experience : {}),
+        JSON.stringify(isObject(body.preferences) ? body.preferences : {}),
+        JSON.stringify(isObject(body.constraints) ? body.constraints : {}),
+      ]
+    );
+    await logActivity({ actor: 'dashboard', action: 'opportunity_profile_updated', entityType: 'opportunity_profile', detail: { skill_count: skills.length } });
+    return reply.send({ profile: result.rows[0] });
+  });
+
+  app.post('/api/opportunity-records/:id/score', async (req, reply) => {
+    const id = Number((req.params as any).id);
+    if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'Invalid opportunity id' });
+    const [profileResult, opportunityResult] = await Promise.all([
+      pool.query(`SELECT skills, preferences, constraints FROM opportunity_profiles WHERE profile_key = 'primary' AND active = true LIMIT 1`),
+      pool.query('SELECT id, opportunity_type, is_remote, required_skills FROM opportunity_records WHERE id = $1', [id]),
+    ]);
+    if (opportunityResult.rowCount === 0) return reply.code(404).send({ error: 'Opportunity not found' });
+    if (profileResult.rowCount === 0) return reply.code(409).send({ error: 'Set up your opportunity profile before matching' });
+
+    const profile = profileResult.rows[0];
+    const opportunity = opportunityResult.rows[0];
+    const normalize = (value: unknown) => String(value).trim().toLowerCase();
+    const profileSkills = new Set((Array.isArray(profile.skills) ? profile.skills : []).map(normalize));
+    const requiredSkills = Array.isArray(opportunity.required_skills) ? opportunity.required_skills.map(normalize) : [];
+    const matchedSkills = requiredSkills.filter((skill: string) => profileSkills.has(skill));
+    const missingSkills = requiredSkills.filter((skill: string) => !profileSkills.has(skill));
+    const preferences = profile.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};
+    const constraints = profile.constraints && typeof profile.constraints === 'object' ? profile.constraints : {};
+    const reasons: string[] = [];
+    let score = requiredSkills.length ? Math.round((matchedSkills.length / requiredSkills.length) * 85) : null;
+    if (score !== null) reasons.push('Skill coverage: ' + matchedSkills.length + ' of ' + requiredSkills.length + ' required skills');
+    if (preferences.remoteOnly === true && opportunity.is_remote !== true) {
+      score = score === null ? 0 : Math.max(0, score - 15);
+      reasons.push('Penalty: this opportunity is not marked remote');
+    }
+    const preferredTypes = Array.isArray(preferences.preferredTypes) ? preferences.preferredTypes : [];
+    if (preferredTypes.length > 0 && !preferredTypes.includes(opportunity.opportunity_type)) {
+      score = score === null ? 0 : Math.max(0, score - 10);
+      reasons.push('Penalty: opportunity type is outside preferred types');
+    }
+    if (score === null) {
+      return reply.code(422).send({ error: 'No matchable criteria found. Add required skills or matching preferences to the opportunity profile.' });
+    }
+    score = Math.min(100, Math.max(0, score));
+    const breakdown = { score, matched_skills: matchedSkills, missing_skills: missingSkills, required_skill_count: requiredSkills.length, reasons, constraints };
+    const updated = await pool.query(
+      `UPDATE opportunity_records
+       SET fit_score = $2, qualification = COALESCE(qualification, '{}'::jsonb) || jsonb_build_object('match', $3::jsonb), updated_at = now()
+       WHERE id = $1 RETURNING *`,
+      [id, score, JSON.stringify(breakdown)]
+    );
+    await logActivity({ actor: 'matching_engine', action: 'opportunity_scored', entityType: 'opportunity_record', entityId: id, detail: { fit_score: score } });
+    return reply.send({ opportunity: updated.rows[0], match: breakdown });
+  });
+
   app.patch('/api/opportunity-records/:id', async (req, reply) => {
     const id = Number((req.params as any).id);
     if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'Invalid opportunity id' });
