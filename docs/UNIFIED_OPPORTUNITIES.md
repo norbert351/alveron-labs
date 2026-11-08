@@ -50,6 +50,9 @@ source attribution and direct links.
 - `PUT /api/opportunity-profile`: save skills, experience, preferences and constraints.
 - `POST /api/opportunity-records/:id/score`: calculate and store an explainable
   match score from skill coverage and configured profile preferences/constraints.
+- `GET /api/opportunity-records/:id/outcomes`: read the human-recorded progress history.
+- `POST /api/opportunity-records/:id/outcomes`: record review, approval, application,
+  response, interview, offer, win/loss, no-response or follow-up events.
 - `POST /api/opportunity-discovery/run`: run provider discovery and import
   existing Alveron business research opportunities.
 - `POST /api/webhook/opportunity-discovery`: same discovery run for n8n, protected
@@ -62,10 +65,11 @@ compensation and allowed currencies. It does not infer seniority or claim that
 a person is qualified from skill-name overlap alone. Compensation constraints
 are applied only when a source provides comparable currency and amount data.
 
-Creating a record or scoring it never contacts a third party or submits an
-application. Approval and external actions remain separate human-controlled
-steps. A status of `approved` records a human review decision only. It does
-not trigger an application.
+Creating a record, scoring it or recording an outcome never contacts a third
+party or submits an application. Approval and external actions remain separate
+human-controlled steps. A status of `approved` records a human review decision
+only. It does not trigger an application. The outcome history provides evidence
+for later conversion analysis and ranking improvements.
 
 ## Scheduling with n8n
 
@@ -83,7 +87,8 @@ workflow can be run manually from n8n as well.
 
 Migration `006_unified_opportunities.sql` creates new tables and indexes.
 Migration `007_opportunity_source_runs.sql` adds a nullable link to source runs.
-Neither migration rewrites or deletes existing opportunity data. Migrations are
+Migration `008_opportunity_outcomes.sql` creates the append-only human outcome
+history. These migrations do not rewrite or delete existing opportunity data. Migrations are
 applied by the repository's existing ordered migration runner.
 
 Provider requests use fixed HTTPS endpoints, timeouts and redirect rejection.
