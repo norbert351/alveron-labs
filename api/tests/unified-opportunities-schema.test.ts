@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { classifyOpportunityType, normalizeRemotive, normalizeRemoteOk, safeListingUrl, salaryRange } from '../src/opportunities/discovery.ts';
+import { classifyOpportunityType, normalizeHackerNews, normalizeRemotive, normalizeRemoteOk, safeListingUrl, salaryRange } from '../src/opportunities/discovery.ts';
 
 const sourceRunMigration = readFileSync(
   new URL('../src/db/migrations/007_opportunity_source_runs.sql', import.meta.url),
@@ -113,4 +113,40 @@ test('source run migration adds nullable lineage without rewriting existing data
   assert.match(sourceRunMigration, /REFERENCES opportunity_source_runs\(id\) ON DELETE SET NULL/i);
   assert.match(sourceRunMigration, /CREATE INDEX IF NOT EXISTS/i);
   assert.doesNotMatch(sourceRunMigration, /\bDROP\s+(TABLE|COLUMN|INDEX)\b/i);
+});
+
+test('Hacker News adapter only keeps actionable, category-matched comments', () => {
+  const hit = normalizeHackerNews({
+    objectID: '987654',
+    story_title: 'Ask HN: Who is hiring?',
+    comment_text: 'We are looking for a freelance TypeScript developer for a paid short-term contract. Remote worldwide.',
+    author: 'sample-company',
+    created_at: '2026-11-08T12:00:00.000Z',
+  }, 'paid_task');
+  assert.ok(hit);
+  assert.equal(hit.source, 'Hacker News');
+  assert.equal(hit.forcedType, 'paid_task');
+  assert.equal(hit.isRemote, true);
+  assert.ok(hit.tags.includes('TypeScript'));
+  assert.match(hit.url, /news\.ycombinator\.com\/item\?id=987654/);
+
+  const irrelevant = normalizeHackerNews({
+    objectID: '987655',
+    comment_text: 'I used to freelance as a developer and learned TypeScript.',
+  }, 'paid_task');
+  assert.equal(irrelevant, null);
+});
+
+test('Hacker News paid research comments are classified only with paid-study evidence', () => {
+  const hit = normalizeHackerNews({
+    objectID: '987656',
+    comment_text: 'We are recruiting participants for a paid user research study. Looking for developers.',
+    author: 'research-team',
+  }, 'paid_research');
+  assert.ok(hit);
+  assert.equal(hit.forcedType, 'paid_research');
+  assert.equal(normalizeHackerNews({
+    objectID: '987657',
+    comment_text: 'We are looking for a research analyst to join our team.',
+  }, 'paid_research'), null);
 });
