@@ -1,9 +1,9 @@
 # Alveron Labs — Lead Intelligence (Internal MVP)
 
-Private internal dashboard for Alveron Labs to research prospect companies, detect
-evidence-backed automation opportunities, score them, generate personalized
-proposals and outreach emails, and route everything through human approval before
-n8n sends anything.
+Internal opportunity intelligence system for Alveron Labs. It researches prospect
+companies, discovers remote work and paid technical opportunities, detects
+evidence-backed business problems, scores opportunities against a saved skills
+profile, and prepares proposals and outreach for human review.
 
 **This is not the public marketing site.** No autonomous mass outreach, no
 auto-sending. Every email requires explicit human approval.
@@ -13,6 +13,7 @@ auto-sending. Every email requires explicit human approval.
 - `api/` — Fastify + PostgreSQL + modular AI services (TypeScript, tsx runtime)
 - `web/` — Next.js App Router dashboard (Obsidian theme, Tailwind)
 - `n8n/workflows/` — importable n8n orchestration workflows
+- Unified Opportunity Hub — one review feed for remote jobs, paid tasks, agency contracts, business leads, paid research and technical content
 - `docs/` — architecture, API, n8n, and security docs
 
 ## Workflow
@@ -24,6 +25,12 @@ Company URL → Website fetch (+headless SPA fallback) → Company Research
 → n8n → real provider send (Gmail/Graph/Resend OAuth) → delivery tracking
 → reply detection → follow-up sequence (stops on reply/reject/pause)
 ```
+
+## Unified opportunity discovery
+
+The dashboard includes `/opportunity-hub` for the normalized opportunity feed and `/opportunity-profile` for skills, experience, location, compensation and work preferences. The API currently ingests RemoteOK and Remotive public remote-job feeds and imports existing Alveron global business research opportunities. Provider results keep source attribution and direct links. The n8n workflow `alveron-opportunity-discovery.json` can schedule discovery every six hours after it is imported and activated. See `docs/UNIFIED_OPPORTUNITIES.md` for provider terms, API routes and setup.
+
+The opportunity matcher is an explainable first-pass rules engine. It shows skill overlap and missing skills, and applies the profile constraints it can verify from source data. It does not submit applications or contact prospects.
 
 ## Quick start
 
@@ -57,12 +64,14 @@ npm run dev                 # :3101
 ## Tests
 
 ```bash
-cd api && NODE_ENV=test node --test --import tsx "tests/*.test.ts"
+cd api && npm ci && npm run build && npm run test:unit
 ```
 
-Coverage: SSRF blocks, auth gates, webhook create/duplicate guards, active-job
-guards, lead dedupe, approval protection, workflow-run recording, scoring
-priority mapping. Requires the API running.
+The unit suite covers research utilities, SSRF protections, scoring, migration
+contracts, discovery normalization and provider URL validation. The existing
+`tests/integration.test.ts` suite requires a running API, a disposable PostgreSQL
+database and an `api/.env` file. GitHub Actions runs the API build and unit suite
+alongside the dashboard typecheck and production build.
 
 ## Guardrails
 
