@@ -205,7 +205,8 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     const requiredSkills = Array.isArray(opportunity.required_skills) ? opportunity.required_skills.map(normalize) : [];
     const matchedSkills = requiredSkills.filter((skill: string) => profileSkills.has(skill));
     const missingSkills = requiredSkills.filter((skill: string) => !profileSkills.has(skill));
-    const preferences = profile.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};\n    const experience = profile.experience && typeof profile.experience === 'object' ? profile.experience : {};
+    const preferences = profile.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};
+    const experience = profile.experience && typeof profile.experience === 'object' ? profile.experience : {};
     const constraints = profile.constraints && typeof profile.constraints === 'object' ? profile.constraints : {};
     const reasons: string[] = [];
     const hasRemotePreference = typeof preferences.remoteOnly === 'boolean';
@@ -238,11 +239,23 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
       reasons.push('Constraint: this opportunity type is excluded by your profile');
     }
     const minimumCompensation = Number(constraints.minimumCompensation);
-    if (Number.isFinite(minimumCompensation) && minimumCompensation > 0 && opportunity.compensation_max != null && Number(opportunity.compensation_max) < minimumCompensation) {
-      score = 0;
-      reasons.push('Constraint: listed compensation is below your minimum');
+    const minimumCurrency = String(constraints.minimumCompensationCurrency || '').toUpperCase();
+    const opportunityCurrency = String(opportunity.compensation_currency || '').toUpperCase();
+    if (Number.isFinite(minimumCompensation) && minimumCompensation > 0 && minimumCurrency && minimumCurrency === opportunityCurrency) {
+      const offeredMinimum = opportunity.compensation_min == null ? null : Number(opportunity.compensation_min);
+      const offeredMaximum = opportunity.compensation_max == null ? null : Number(opportunity.compensation_max);
+      if ((offeredMinimum !== null && offeredMinimum < minimumCompensation) || (offeredMinimum === null && offeredMaximum !== null && offeredMaximum < minimumCompensation)) {
+        score = 0;
+        reasons.push('Constraint: listed compensation range is below your minimum');
+      }
+    } else if (Number.isFinite(minimumCompensation) && minimumCompensation > 0 && opportunityCurrency && minimumCurrency && opportunityCurrency !== minimumCurrency) {
+      reasons.push('Compensation threshold not compared because the listing currency differs from your minimum currency');
     }
-    const candidateCountry = String(preferences.country || '').trim().toLowerCase();\n    const opportunityLocation = String(opportunity.location || '').trim().toLowerCase();\n    const locationIsBroad = /worldwide|anywhere|global|all locations|africa|emea|americas|europe|asia pacific/.test(opportunityLocation);\n    if (candidateCountry && opportunityLocation && !locationIsBroad && !opportunityLocation.includes(candidateCountry)) {\n      score = 0;\n      reasons.push('Location may be restricted to ' + String(opportunity.location) + ', which does not explicitly include ' + String(preferences.country));\n    }\n    const allowedCurrencies = Array.isArray(constraints.allowedCurrencies) ? constraints.allowedCurrencies.map((currency: unknown) => String(currency).toUpperCase()) : [];
+    const candidateCountry = String(preferences.country || '').trim().toLowerCase();
+    const opportunityLocation = String(opportunity.location || '').trim().toLowerCase();
+    const locationIsBroad = /worldwide|anywhere|global|all locations|africa|emea|americas|europe|asia pacific/.test(opportunityLocation);
+    if (candidateCountry && opportunityLocation && !locationIsBroad && !opportunityLocation.includes(candidateCountry)) {\n      score = 0;\n      reasons.push('Location may be restricted to ' + String(opportunity.location) + ', which does not explicitly include ' + String(preferences.country));
+    }\n    const allowedCurrencies = Array.isArray(constraints.allowedCurrencies) ? constraints.allowedCurrencies.map((currency: unknown) => String(currency).toUpperCase()) : [];
     if (allowedCurrencies.length > 0 && opportunity.compensation_currency && !allowedCurrencies.includes(String(opportunity.compensation_currency).toUpperCase())) {
       score = 0;
       reasons.push('Constraint: compensation currency is outside your allowed currencies');
