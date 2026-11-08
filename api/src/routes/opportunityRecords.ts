@@ -179,16 +179,29 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     const preferences = profile.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};
     const constraints = profile.constraints && typeof profile.constraints === 'object' ? profile.constraints : {};
     const reasons: string[] = [];
-    let score = requiredSkills.length ? Math.round((matchedSkills.length / requiredSkills.length) * 85) : null;
-    if (score !== null) reasons.push('Skill coverage: ' + matchedSkills.length + ' of ' + requiredSkills.length + ' required skills');
-    if (preferences.remoteOnly === true && opportunity.is_remote !== true) {
-      score = score === null ? 0 : Math.max(0, score - 15);
-      reasons.push('Penalty: this opportunity is not marked remote');
+    const hasRemotePreference = typeof preferences.remoteOnly === 'boolean';
+    const hasTypePreference = Array.isArray(preferences.preferredTypes) && preferences.preferredTypes.length > 0;
+    let score = requiredSkills.length ? Math.round((matchedSkills.length / requiredSkills.length) * 85) : (hasRemotePreference || hasTypePreference ? 50 : null);
+    if (requiredSkills.length) reasons.push('Skill coverage: ' + matchedSkills.length + ' of ' + requiredSkills.length + ' required skills');
+    if (!requiredSkills.length && score !== null) reasons.push('Baseline score from profile preferences. Add required skills for a stronger match estimate');
+    if (preferences.remoteOnly === true) {
+      if (opportunity.is_remote === true) {
+        score = score === null ? 65 : Math.min(100, score + 10);
+        reasons.push('Preference match: remote opportunity');
+      } else {
+        score = score === null ? 0 : Math.max(0, score - 15);
+        reasons.push('Penalty: this opportunity is not marked remote');
+      }
     }
     const preferredTypes = Array.isArray(preferences.preferredTypes) ? preferences.preferredTypes : [];
-    if (preferredTypes.length > 0 && !preferredTypes.includes(opportunity.opportunity_type)) {
-      score = score === null ? 0 : Math.max(0, score - 10);
-      reasons.push('Penalty: opportunity type is outside preferred types');
+    if (preferredTypes.length > 0) {
+      if (preferredTypes.includes(opportunity.opportunity_type)) {
+        score = score === null ? 60 : Math.min(100, score + 10);
+        reasons.push('Preference match: opportunity type is preferred');
+      } else {
+        score = score === null ? 0 : Math.max(0, score - 10);
+        reasons.push('Penalty: opportunity type is outside preferred types');
+      }
     }
     const blockedTypes = Array.isArray(constraints.blockedTypes) ? constraints.blockedTypes : [];
     if (blockedTypes.includes(opportunity.opportunity_type)) {
