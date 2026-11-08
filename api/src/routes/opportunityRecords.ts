@@ -164,7 +164,7 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'Invalid opportunity id' });
     const [profileResult, opportunityResult] = await Promise.all([
       pool.query(`SELECT skills, preferences, constraints FROM opportunity_profiles WHERE profile_key = 'primary' AND active = true LIMIT 1`),
-      pool.query('SELECT id, opportunity_type, is_remote, required_skills FROM opportunity_records WHERE id = $1', [id]),
+      pool.query('SELECT id, opportunity_type, is_remote, required_skills, compensation_max, compensation_currency FROM opportunity_records WHERE id = $1', [id]),
     ]);
     if (opportunityResult.rowCount === 0) return reply.code(404).send({ error: 'Opportunity not found' });
     if (profileResult.rowCount === 0) return reply.code(409).send({ error: 'Set up your opportunity profile before matching' });
@@ -189,6 +189,21 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     if (preferredTypes.length > 0 && !preferredTypes.includes(opportunity.opportunity_type)) {
       score = score === null ? 0 : Math.max(0, score - 10);
       reasons.push('Penalty: opportunity type is outside preferred types');
+    }
+    const blockedTypes = Array.isArray(constraints.blockedTypes) ? constraints.blockedTypes : [];
+    if (blockedTypes.includes(opportunity.opportunity_type)) {
+      score = 0;
+      reasons.push('Constraint: this opportunity type is excluded by your profile');
+    }
+    const minimumCompensation = Number(constraints.minimumCompensation);
+    if (Number.isFinite(minimumCompensation) && minimumCompensation > 0 && opportunity.compensation_max != null && Number(opportunity.compensation_max) < minimumCompensation) {
+      score = 0;
+      reasons.push('Constraint: listed compensation is below your minimum');
+    }
+    const allowedCurrencies = Array.isArray(constraints.allowedCurrencies) ? constraints.allowedCurrencies.map((currency: unknown) => String(currency).toUpperCase()) : [];
+    if (allowedCurrencies.length > 0 && opportunity.compensation_currency && !allowedCurrencies.includes(String(opportunity.compensation_currency).toUpperCase())) {
+      score = 0;
+      reasons.push('Constraint: compensation currency is outside your allowed currencies');
     }
     if (score === null) {
       return reply.code(422).send({ error: 'No matchable criteria found. Add required skills or matching preferences to the opportunity profile.' });
