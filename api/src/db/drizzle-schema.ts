@@ -15,9 +15,9 @@ import {
 } from 'drizzle-orm/pg-core';
 
 const jsonArray = <T extends unknown[]>(name: string) =>
-  jsonb(name).$type<T>().notNull().default(sql\`'[]'::jsonb\`);
+  jsonb(name).$type<T>().notNull().default(sql`'[]'::jsonb`);
 const jsonObject = <T extends Record<string, unknown>>(name: string) =>
-  jsonb(name).$type<T>().notNull().default(sql\`'{}'::jsonb\`);
+  jsonb(name).$type<T>().notNull().default(sql`'{}'::jsonb`);
 
 export const companies = pgTable('companies', {
   id: serial('id').primaryKey(),
