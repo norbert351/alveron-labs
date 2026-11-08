@@ -7,7 +7,7 @@ import { api } from '@/lib/api';
 
 type OpportunityType = 'remote_job' | 'paid_task' | 'agency_contract' | 'business_lead' | 'paid_research' | 'technical_content';
 type OpportunityStatus = 'discovered' | 'reviewing' | 'qualified' | 'approved' | 'rejected' | 'applied' | 'closed' | 'expired';
-interface OpportunityRecord {
+interface DiscoveryRun { id: number; source_name: string; opportunity_type: string; status: string; discovered_count: number; new_count: number; duplicate_count: number; error: string | null; created_at: string; completed_at: string | null; }\n\ninterface OpportunityRecord {
   id: number;
   opportunity_type: OpportunityType;
   source_name: string;
@@ -53,6 +53,7 @@ function money(o: OpportunityRecord) {
 
 export default function OpportunityHubPage() {
   const [items, setItems] = useState<OpportunityRecord[]>([]);
+  const [runs, setRuns] = useState<DiscoveryRun[]>([]);
   const [type, setType] = useState<OpportunityType | ''>('');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
@@ -170,6 +171,30 @@ export default function OpportunityHubPage() {
         </div>
         <div className="mt-3 flex items-center gap-2 text-[11px] text-ink-muted"><SlidersHorizontal size={12} /> Filters apply to the unified opportunity records.</div>
       </div>
+
+
+      <section className="card mb-5 p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <div className="text-sm font-semibold text-ink">Recent discovery activity</div>
+          <span className="text-[10px] uppercase tracking-wider text-ink-muted">Latest source runs</span>
+        </div>
+        {runs.length === 0 ? (
+          <p className="text-xs text-ink-muted">No discovery runs have been recorded yet.</p>
+        ) : (
+          <div className="space-y-2">
+            {runs.map((run) => (
+              <div key={run.id} className="flex flex-wrap items-center justify-between gap-2 border-b border-obsidian-border/60 pb-2 last:border-0 last:pb-0">
+                <div>
+                  <div className="text-xs font-medium text-ink">{run.source_name}</div>
+                  <div className="text-[10px] text-ink-muted">{run.new_count} new · {run.duplicate_count} duplicates · {new Date(run.created_at).toLocaleString()}</div>
+                  {run.error && <div className="mt-1 text-[10px] text-red-300">{run.error}</div>}
+                </div>
+                <span className="badge border-obsidian-border text-ink-muted">{run.status}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       {error && <div className="mb-4 rounded-lg border border-red-500/25 bg-red-500/5 p-3 text-sm text-red-300">{error}</div>}
       {notice && <div className="mb-4 rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3 text-sm text-emerald-300">{notice}</div>}
