@@ -86,6 +86,22 @@ test('matching produces an explainable score and rejects unsafe input', async ()
   assert.deepEqual(scored.body.match.matched_skills.sort(), ['React', 'TypeScript'].map((s) => s.toLowerCase()).sort());
   assert.equal(scored.body.match.candidate_country, 'Nigeria');
 
+  const applied = await request('/api/opportunity-records/' + createdId + '/outcomes', 'POST', { event_type: 'applied', notes: 'Submitted manually after reviewing the listing.' });
+  assert.equal(applied.status, 201);
+  assert.equal(applied.body.outcome.event_type, 'applied');
+  const outcomes = await request('/api/opportunity-records/' + createdId + '/outcomes');
+  assert.equal(outcomes.status, 200);
+  assert.equal(outcomes.body.outcomes.length, 1);
+  assert.equal(outcomes.body.outcomes[0].notes, 'Submitted manually after reviewing the listing.');
+
+  const latest = await request('/api/opportunity-records?type=remote_job&search=CI%20Test%20Opportunity');
+  const savedRecord = latest.body.opportunities.find((item: any) => Number(item.id) === createdId);
+  assert.equal(savedRecord.status, 'applied');
+  assert.equal(savedRecord.latest_outcome_type, 'applied');
+
+  const invalidOutcome = await request('/api/opportunity-records/' + createdId + '/outcomes', 'POST', { event_type: 'auto_apply' });
+  assert.equal(invalidOutcome.status, 400);
+
   const unsafe = await request('/api/opportunity-records', 'POST', {
     opportunity_type: 'remote_job',
     source_name: 'Bad Source',
