@@ -10,7 +10,7 @@ type Profile = {
   display_name: string;
   skills: string[];
   experience: Record<string, unknown>;
-  preferences: { remoteOnly?: boolean; preferredTypes?: string[] };
+  preferences: { remoteOnly?: boolean; preferredTypes?: string[]; country?: string };
   constraints: { blockedTypes?: string[]; minimumCompensation?: number; minimumCompensationCurrency?: string; allowedCurrencies?: string[] };
 };
 const TYPES = [
