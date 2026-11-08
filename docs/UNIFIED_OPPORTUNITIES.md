@@ -106,5 +106,7 @@ they are stored. The adapters do not automatically open arbitrary job URLs.
    matching.
 4. Add a unified dashboard review queue, saved searches and daily briefings.
 5. Add outcome tracking and learning from applications and client responses.
-6. Add Drizzle ORM and typed schemas incrementally while retaining PostgreSQL
-   and validating compatibility with the current `pg` queries.
+6. Continue migrating the remaining raw `pg` data-access paths to Drizzle. The
+   opportunity profile read/write path now uses Drizzle on the existing shared
+   `pg` Pool. The typed schema maps the new opportunity tables, while the current
+   SQL migration runner remains the source of database changes.
