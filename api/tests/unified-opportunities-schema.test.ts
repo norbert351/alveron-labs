@@ -45,3 +45,13 @@ test('opportunity schema stores provenance, evidence, fit and review state', () 
     assert.match(migration, new RegExp('\\b' + field + '\\b', 'i'), `missing field: ${field}`);
   }
 });
+
+test('Fastify exposes the profile and scoring endpoints', () => {
+  const routes = readFileSync(
+    new URL('../src/routes/opportunityRecords.ts', import.meta.url),
+    'utf8'
+  );
+  assert.match(routes, /GET\x27, async|app\.get\('\/api\/opportunity-profile'/);
+  assert.match(routes, /app\.put\('\/api\/opportunity-profile'/);
+  assert.match(routes, /app\.post\('\/api\/opportunity-records\/:id\/score'/);
+});
