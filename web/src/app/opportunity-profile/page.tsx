@@ -25,8 +25,8 @@ const TYPES = [
 export default function OpportunityProfilePage() {
   const [name, setName] = useState('Primary profile');
   const [skills, setSkills] = useState('');
-  const [remoteOnly, setRemoteOnly] = useState(true);
-  const [preferred, setPreferred] = useState<string[]>(['remote_job', 'paid_task', 'agency_contract']);
+  const [remoteOnly, setRemoteOnly] = useState(false);
+  const [preferred, setPreferred] = useState<string[]>([]);
   const [blocked, setBlocked] = useState<string[]>([]);
   const [minimum, setMinimum] = useState('');
   const [currencies, setCurrencies] = useState('USD, NGN');
@@ -38,8 +38,8 @@ export default function OpportunityProfilePage() {
     api.get<{ profile: Profile }>('/api/opportunity-profile').then(({ profile }) => {
       setName(profile.display_name || 'Primary profile');
       setSkills((profile.skills || []).join(', '));
-      setRemoteOnly(profile.preferences?.remoteOnly ?? true);
-      setPreferred(profile.preferences?.preferredTypes || ['remote_job', 'paid_task', 'agency_contract']);
+      setRemoteOnly(profile.preferences?.remoteOnly ?? false);
+      setPreferred(profile.preferences?.preferredTypes || []);
       setBlocked(profile.constraints?.blockedTypes || []);
       setMinimum(profile.constraints?.minimumCompensation == null ? '' : String(profile.constraints.minimumCompensation));
       setCurrencies((profile.constraints?.allowedCurrencies || ['USD', 'NGN']).join(', '));
