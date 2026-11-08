@@ -4,7 +4,12 @@ import { readFileSync } from 'node:fs';
 
 import { classifyOpportunityType, normalizeRemotive, normalizeRemoteOk, safeListingUrl, salaryRange } from '../src/opportunities/discovery.ts';
 
-const sourceRunMigration = readFileSync(\n  new URL('../src/db/migrations/007_opportunity_source_runs.sql', import.meta.url),\n  'utf8'\n);\n\nconst migration = readFileSync(
+const sourceRunMigration = readFileSync(
+  new URL('../src/db/migrations/007_opportunity_source_runs.sql', import.meta.url),
+  'utf8'
+);
+
+const migration = readFileSync(
   new URL('../src/db/migrations/006_unified_opportunities.sql', import.meta.url),
   'utf8'
 );
