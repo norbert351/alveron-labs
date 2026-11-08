@@ -5,6 +5,7 @@ import { listOpportunitySourceRuns, runOpportunityDiscovery } from '../opportuni
 const TYPES = new Set(['remote_job', 'paid_task', 'agency_contract', 'business_lead', 'paid_research', 'technical_content']);
 const STATUSES = new Set(['discovered', 'reviewing', 'qualified', 'approved', 'rejected', 'applied', 'closed', 'expired']);
 const VERIFICATION = new Set(['unverified', 'partial', 'verified']);
+const OUTCOME_TYPES = new Set(['reviewed', 'approved', 'rejected', 'applied', 'response_received', 'interview', 'offer', 'won', 'lost', 'no_response', 'follow_up', 'closed']);
 
 function safeHttpUrl(value: unknown): string | null {
   if (typeof value !== 'string') return null;
@@ -69,7 +70,7 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     params.push(limit, offset);
     const where = conditions.length ? 'WHERE ' + conditions.join(' AND ') : '';
     const result = await pool.query(
-      'SELECT o.*, c.name AS company_name, c.website AS company_website FROM opportunity_records o LEFT JOIN companies c ON c.id = o.company_id ' +
+      'SELECT o.*, c.name AS company_name, c.website AS company_website, latest.event_type AS latest_outcome_type, latest.event_at AS latest_outcome_at FROM opportunity_records o LEFT JOIN companies c ON c.id = o.company_id LEFT JOIN LATERAL (SELECT event_type, event_at FROM opportunity_outcomes oo WHERE oo.opportunity_id = o.id ORDER BY event_at DESC LIMIT 1) latest ON true ' +
       where + ' ORDER BY CASE WHEN o.deadline_at IS NOT NULL AND o.deadline_at < now() THEN 1 ELSE 0 END, o.fit_score DESC NULLS LAST, o.discovered_at DESC LIMIT $' +
       (params.length - 1) + ' OFFSET $' + params.length,
       params
@@ -276,6 +277,67 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     );
     await logActivity({ actor: 'matching_engine', action: 'opportunity_scored', entityType: 'opportunity_record', entityId: id, detail: { fit_score: score } });
     return reply.send({ opportunity: updated.rows[0], match: breakdown });
+  });
+
+  app.get('/api/opportunity-records/:id/outcomes', async (req, reply) => {
+    const id = Number((req.params as any).id);
+    if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'Invalid opportunity id' });
+    const exists = await pool.query('SELECT id FROM opportunity_records WHERE id = $1', [id]);
+    if (exists.rowCount === 0) return reply.code(404).send({ error: 'Opportunity not found' });
+    const result = await pool.query(
+      'SELECT id, opportunity_id, event_type, notes, metadata, event_at, created_at FROM opportunity_outcomes WHERE opportunity_id = $1 ORDER BY event_at DESC, id DESC',
+      [id]
+    );
+    return reply.send({ outcomes: result.rows });
+  });
+
+  app.post('/api/opportunity-records/:id/outcomes', async (req, reply) => {
+    const id = Number((req.params as any).id);
+    if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'Invalid opportunity id' });
+    const body = (req.body || {}) as Record<string, unknown>;
+    const eventType = String(body.event_type || '');
+    if (!OUTCOME_TYPES.has(eventType)) return reply.code(400).send({ error: 'Invalid outcome event_type' });
+    const notes = body.notes == null ? null : String(body.notes).trim().slice(0, 5000);
+    const metadata = body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata) ? body.metadata : {};
+    let eventAt: string | null = null;
+    try {
+      if (body.event_at != null) eventAt = new Date(String(body.event_at)).toISOString();
+    } catch {
+      return reply.code(400).send({ error: 'Invalid event_at date' });
+    }
+
+    const exists = await pool.query('SELECT id FROM opportunity_records WHERE id = $1', [id]);
+    if (exists.rowCount === 0) return reply.code(404).send({ error: 'Opportunity not found' });
+    const result = await pool.query(
+      \`INSERT INTO opportunity_outcomes (opportunity_id, event_type, notes, metadata, event_at)
+       VALUES ($1, $2, $3, $4::jsonb, COALESCE($5::timestamptz, now()))
+       RETURNING id, opportunity_id, event_type, notes, metadata, event_at, created_at\`,
+      [id, eventType, notes, JSON.stringify(metadata), eventAt]
+    );
+
+    const statusByEvent: Record<string, string> = {
+      approved: 'approved',
+      rejected: 'rejected',
+      applied: 'applied',
+      closed: 'closed',
+    };
+    const nextStatus = statusByEvent[eventType];
+    if (nextStatus) {
+      await pool.query(
+        \`UPDATE opportunity_records SET status = $2,
+         applied_at = CASE WHEN $2 = 'applied' THEN COALESCE(applied_at, $3::timestamptz, now()) ELSE applied_at END,
+         updated_at = now() WHERE id = $1\`,
+        [id, nextStatus, eventAt]
+      );
+    }
+    await logActivity({
+      actor: 'dashboard',
+      action: 'opportunity_outcome_recorded',
+      entityType: 'opportunity_record',
+      entityId: id,
+      detail: { event_type: eventType },
+    });
+    return reply.code(201).send({ outcome: result.rows[0] });
   });
 
   app.patch('/api/opportunity-records/:id', async (req, reply) => {
