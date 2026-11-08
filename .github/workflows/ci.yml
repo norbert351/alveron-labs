@@ -40,7 +40,7 @@ jobs:
 
       - name: Commit generated API lockfile on feature branch
         if: github.event_name == 'push' && github.ref == 'refs/heads/feat/unified-opportunity-engine'
-        working-directory: ..
+        working-directory: .
         run: |
           if git diff --quiet -- api/package-lock.json; then
             echo "API lockfile already current"
