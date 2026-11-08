@@ -192,8 +192,8 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     const id = Number((req.params as any).id);
     if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'Invalid opportunity id' });
     const [profileResult, opportunityResult] = await Promise.all([
-      pool.query(`SELECT skills, preferences, constraints FROM opportunity_profiles WHERE profile_key = 'primary' AND active = true LIMIT 1`),
-      pool.query('SELECT id, opportunity_type, is_remote, required_skills, compensation_max, compensation_currency FROM opportunity_records WHERE id = $1', [id]),
+      pool.query(`SELECT skills, experience, preferences, constraints FROM opportunity_profiles WHERE profile_key = 'primary' AND active = true LIMIT 1`),
+      pool.query('SELECT id, opportunity_type, is_remote, required_skills, location, compensation_min, compensation_max, compensation_currency FROM opportunity_records WHERE id = $1', [id]),
     ]);
     if (opportunityResult.rowCount === 0) return reply.code(404).send({ error: 'Opportunity not found' });
     if (profileResult.rowCount === 0) return reply.code(409).send({ error: 'Set up your opportunity profile before matching' });
@@ -205,7 +205,7 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
     const requiredSkills = Array.isArray(opportunity.required_skills) ? opportunity.required_skills.map(normalize) : [];
     const matchedSkills = requiredSkills.filter((skill: string) => profileSkills.has(skill));
     const missingSkills = requiredSkills.filter((skill: string) => !profileSkills.has(skill));
-    const preferences = profile.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};
+    const preferences = profile.preferences && typeof profile.preferences === 'object' ? profile.preferences : {};\n    const experience = profile.experience && typeof profile.experience === 'object' ? profile.experience : {};
     const constraints = profile.constraints && typeof profile.constraints === 'object' ? profile.constraints : {};
     const reasons: string[] = [];
     const hasRemotePreference = typeof preferences.remoteOnly === 'boolean';
@@ -242,7 +242,7 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
       score = 0;
       reasons.push('Constraint: listed compensation is below your minimum');
     }
-    const allowedCurrencies = Array.isArray(constraints.allowedCurrencies) ? constraints.allowedCurrencies.map((currency: unknown) => String(currency).toUpperCase()) : [];
+    const candidateCountry = String(preferences.country || '').trim().toLowerCase();\n    const opportunityLocation = String(opportunity.location || '').trim().toLowerCase();\n    const locationIsBroad = /worldwide|anywhere|global|all locations|africa|emea|americas|europe|asia pacific/.test(opportunityLocation);\n    if (candidateCountry && opportunityLocation && !locationIsBroad && !opportunityLocation.includes(candidateCountry)) {\n      score = 0;\n      reasons.push('Location may be restricted to ' + String(opportunity.location) + ', which does not explicitly include ' + String(preferences.country));\n    }\n    const allowedCurrencies = Array.isArray(constraints.allowedCurrencies) ? constraints.allowedCurrencies.map((currency: unknown) => String(currency).toUpperCase()) : [];
     if (allowedCurrencies.length > 0 && opportunity.compensation_currency && !allowedCurrencies.includes(String(opportunity.compensation_currency).toUpperCase())) {
       score = 0;
       reasons.push('Constraint: compensation currency is outside your allowed currencies');
@@ -251,7 +251,7 @@ export function registerUnifiedOpportunityRoutes(app: FastifyInstance) {
       return reply.code(422).send({ error: 'No matchable criteria found. Add required skills or matching preferences to the opportunity profile.' });
     }
     score = Math.min(100, Math.max(0, score));
-    const breakdown = { score, matched_skills: matchedSkills, missing_skills: missingSkills, required_skill_count: requiredSkills.length, reasons, constraints };
+    const breakdown = { score, matched_skills: matchedSkills, missing_skills: missingSkills, required_skill_count: requiredSkills.length, reasons, experience_profile: experience, candidate_country: preferences.country || null, constraints };
     const updated = await pool.query(
       `UPDATE opportunity_records
        SET fit_score = $2, qualification = COALESCE(qualification, '{}'::jsonb) || jsonb_build_object('match', $3::jsonb), updated_at = now()
