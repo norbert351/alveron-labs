@@ -90,7 +90,22 @@ export default function OpportunityHubPage() {
     verified: items.filter((o) => o.verification_status === 'verified').length,
   }), [items]);
 
-  async function runDiscovery() {\n    setDiscoveryBusy(true);\n    setError('');\n    setNotice('');\n    try {\n      const result = await api.post<{ totals: { fetched: number; inserted: number; duplicates: number } }>('/api/opportunity-discovery/run');\n      setNotice('Discovery finished. ' + result.totals.inserted + ' new opportunities added from ' + result.totals.fetched + ' listings.');\n      await load();\n    } catch (e) {\n      setError(e instanceof Error ? e.message : 'Discovery could not run');\n    } finally {\n      setDiscoveryBusy(false);\n    }\n  }\n\n  async function score(id: number) {
+  async function runDiscovery() {
+    setDiscoveryBusy(true);
+    setError('');
+    setNotice('');
+    try {
+      const result = await api.post<{ totals: { fetched: number; inserted: number; duplicates: number } }>('/api/opportunity-discovery/run');
+      setNotice('Discovery finished. ' + result.totals.inserted + ' new opportunities added from ' + result.totals.fetched + ' listings.');
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Discovery could not run');
+    } finally {
+      setDiscoveryBusy(false);
+    }
+  }
+
+  async function score(id: number) {
     setBusy(id);
     setError('');
     setNotice('');
@@ -127,7 +142,8 @@ export default function OpportunityHubPage() {
           <p className="mt-1 max-w-2xl text-sm text-ink-muted">One review queue for paid work, contracts, client leads and research opportunities.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button className="btn-primary" onClick={() => void runDiscovery()} disabled={discoveryBusy}><RefreshCw size={14} className={discoveryBusy ? 'animate-spin' : ''} /> {discoveryBusy ? 'Discovering…' : 'Run discovery'}</button>\n          <Link href="/opportunity-profile" className="btn-ghost"><Target size={14} /> Matching profile</Link>
+          <button className="btn-primary" onClick={() => void runDiscovery()} disabled={discoveryBusy}><RefreshCw size={14} className={discoveryBusy ? 'animate-spin' : ''} /> {discoveryBusy ? 'Discovering…' : 'Run discovery'}</button>
+          <Link href="/opportunity-profile" className="btn-ghost"><Target size={14} /> Matching profile</Link>
           <button className="btn-ghost" onClick={() => void load()} disabled={loading}><RefreshCw size={14} /> Refresh</button>
         </div>
       </div>
