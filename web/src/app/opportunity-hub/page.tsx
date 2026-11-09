@@ -67,6 +67,7 @@ export default function OpportunityHubPage() {
   const [outcomeDrafts, setOutcomeDrafts] = useState<Record<number, { event_type: string; notes: string }>>({});
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [applicationDrafts, setApplicationDrafts] = useState<Record<number, { subject: string; body: string; matched_skills: string[]; missing_skills: string[]; disclaimer: string }>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -151,6 +152,21 @@ export default function OpportunityHubPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not score this opportunity');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function generateApplicationDraft(id: number) {
+    setBusy(id);
+    setError('');
+    setNotice('');
+    try {
+      const result = await api.post<{ draft: { subject: string; body: string; matched_skills: string[]; missing_skills: string[]; disclaimer: string } }>(`/api/opportunity-records/${id}/application-draft`);
+      setApplicationDrafts((current) => ({ ...current, [id]: result.draft }));
+      setNotice('Application draft generated. Review it before using.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not generate an application draft');
     } finally {
       setBusy(null);
     }
@@ -282,6 +298,7 @@ export default function OpportunityHubPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <a href={o.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-electric-bright hover:underline">Open original source <ArrowUpRight size={12} /></a>
                     <button className="btn-ghost text-xs" onClick={() => void score(o.id)} disabled={busy !== null}>{busy === o.id ? 'Scoring…' : 'Calculate fit'}</button>
+                    <button className="btn-ghost text-xs" onClick={() => void generateApplicationDraft(o.id)} disabled={busy !== null}>{busy === o.id ? 'Preparing…' : 'Draft application'}</button>
                   </div>
                   <select aria-label={`Status for ${o.title}`} className="input w-auto min-w-36 text-xs" value={o.status} onChange={(e) => void changeStatus(o.id, e.target.value as OpportunityStatus)} disabled={busy !== null}>
                     {STATUSES.map((s) => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
@@ -310,6 +327,16 @@ export default function OpportunityHubPage() {
                   </div>
                   <p className="mt-2 text-[10px] text-ink-muted">This only records your progress. It never submits an application or contacts anyone.</p>
                 </details>
+                {applicationDrafts[o.id] && <details className="mt-3 border-t border-obsidian-border pt-3" open>
+                  <summary className="cursor-pointer text-xs font-medium text-electric-bright">Application draft, review before use</summary>
+                  <div className="mt-3 space-y-2">
+                    <div className="text-xs text-ink-muted">Subject: {applicationDrafts[o.id].subject}</div>
+                    <textarea className="input min-h-52 w-full text-xs leading-relaxed" readOnly value={applicationDrafts[o.id].body} />
+                    <div className="text-xs text-ink-muted">Matched skills: {applicationDrafts[o.id].matched_skills.join(', ') || 'None recorded'}</div>
+                    {applicationDrafts[o.id].missing_skills.length > 0 && <div className="text-xs text-amber-300">Missing skills: {applicationDrafts[o.id].missing_skills.join(', ')}</div>}
+                    <p className="text-[10px] text-ink-muted">{applicationDrafts[o.id].disclaimer}</p>
+                  </div>
+                </details>}
               </article>
             );
           })}
