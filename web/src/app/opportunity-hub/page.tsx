@@ -68,6 +68,7 @@ export default function OpportunityHubPage() {
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [applicationDrafts, setApplicationDrafts] = useState<Record<number, { subject: string; body: string; matched_skills: string[]; missing_skills: string[]; disclaimer: string }>>({});
+  const [sourceChecks, setSourceChecks] = useState<Record<number, { state: string; http_status: number | null; detail: string }>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -152,6 +153,21 @@ export default function OpportunityHubPage() {
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not score this opportunity');
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function checkSource(id: number) {
+    setBusy(id);
+    setError('');
+    setNotice('');
+    try {
+      const result = await api.post<{ source_check: { state: string; http_status: number | null; detail: string } }>(`/api/opportunity-records/${id}/check-source`);
+      setSourceChecks((current) => ({ ...current, [id]: result.source_check }));
+      setNotice('Source check completed. Review its result before acting.');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Could not check the source');
     } finally {
       setBusy(null);
     }
@@ -298,6 +314,7 @@ export default function OpportunityHubPage() {
                   <div className="flex flex-wrap items-center gap-2">
                     <a href={o.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-electric-bright hover:underline">Open original source <ArrowUpRight size={12} /></a>
                     <button className="btn-ghost text-xs" onClick={() => void score(o.id)} disabled={busy !== null}>{busy === o.id ? 'Scoring…' : 'Calculate fit'}</button>
+                    <button className="btn-ghost text-xs" onClick={() => void checkSource(o.id)} disabled={busy !== null}>{busy === o.id ? 'Checking…' : 'Check source'}</button>
                     <button className="btn-ghost text-xs" onClick={() => void generateApplicationDraft(o.id)} disabled={busy !== null}>{busy === o.id ? 'Preparing…' : 'Draft application'}</button>
                   </div>
                   <select aria-label={`Status for ${o.title}`} className="input w-auto min-w-36 text-xs" value={o.status} onChange={(e) => void changeStatus(o.id, e.target.value as OpportunityStatus)} disabled={busy !== null}>
@@ -327,6 +344,7 @@ export default function OpportunityHubPage() {
                   </div>
                   <p className="mt-2 text-[10px] text-ink-muted">This only records your progress. It never submits an application or contacts anyone.</p>
                 </details>
+                {sourceChecks[o.id] && <p className="mt-3 text-xs text-ink-muted">Source check: <span className={sourceChecks[o.id].state === 'reachable' ? 'text-emerald-300' : 'text-amber-300'}>{sourceChecks[o.id].state}{sourceChecks[o.id].http_status ? ' · HTTP ' + sourceChecks[o.id].http_status : ''}</span>. {sourceChecks[o.id].detail}</p>}
                 {applicationDrafts[o.id] && <details className="mt-3 border-t border-obsidian-border pt-3" open>
                   <summary className="cursor-pointer text-xs font-medium text-electric-bright">Application draft, review before use</summary>
                   <div className="mt-3 space-y-2">
