@@ -1,0 +1,124 @@
+{
+  "name": "Alveron Daily Opportunity Briefing",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "triggerAtHour": 8,
+              "triggerAtMinute": 30
+            }
+          ]
+        }
+      },
+      "id": "daily-opportunity-schedule",
+      "name": "Every Day at 08:30",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "={{ ($env.ALVERON_API_BASE || 'http://127.0.0.1:3100') + '/api/opportunity-intelligence/briefing?limit=10' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.ALVERON_INTERNAL_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "get-opportunity-briefing",
+      "name": "Get Ranked Opportunities",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const payload = $input.first().json;\nconst items = Array.isArray(payload.opportunities) ? payload.opportunities : [];\nconst date = new Date(payload.generated_at || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });\nconst lines = ['ALVERON LABS | DAILY OPPORTUNITY BRIEFING', date, '', `New review queue: ${items.length} ranked opportunities`, ''];\nfor (const [index, item] of items.entries()) {\n  const pay = item.compensation_min != null ? `${item.compensation_currency || ''} ${item.compensation_min}${item.compensation_max != null && item.compensation_max !== item.compensation_min ? ` - ${item.compensation_max}` : ''}`.trim() : 'Pay not stated';\n  lines.push(`${index + 1}. ${item.title}`);\n  lines.push(`Priority ${item.priority_score}/100 | Fit ${item.fit_score ?? 'not scored'} | Quality ${item.quality.score}/100`);\n  lines.push(`${item.organization_name || 'Organization not listed'} | ${item.opportunity_type.replaceAll('_', ' ')} | ${pay}`);\n  lines.push(item.source_url);\n  if (item.quality.blockers.length) lines.push(`Check: ${item.quality.blockers.slice(0, 2).join(' ')}`);\n  lines.push('');\n}\nif (!items.length) lines.push('No active opportunities are currently available.');\nlines.push('Review each original listing before applying. This briefing does not verify that listings are still open.');\nreturn [{ json: { text: lines.join('\\n').slice(0, 3900), count: items.length } }];"
+      },
+      "id": "format-daily-briefing",
+      "name": "Format Telegram Briefing",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://api.telegram.org/bot' + $env.ALVERON_TELEGRAM_BOT_TOKEN + '/sendMessage' }}",
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ chat_id: $env.ALVERON_TELEGRAM_CHAT_ID, text: $json.text, disable_web_page_preview: true }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "id": "send-telegram-briefing",
+      "name": "Send Telegram Briefing",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Every Day at 08:30": {
+      "main": [
+        [
+          {
+            "node": "Get Ranked Opportunities",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Ranked Opportunities": {
+      "main": [
+        [
+          {
+            "node": "Format Telegram Briefing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Telegram Briefing": {
+      "main": [
+        [
+          {
+            "node": "Send Telegram Briefing",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
