@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { assessOpportunityQuality, buildApplicationDraft, calculateOpportunityPriority } from '../src/opportunities/intelligence.ts';
+import { assessOpportunityQuality, buildApplicationDraft, calculateOpportunityPriority, calculateOutcomeAdjustment } from '../src/opportunities/intelligence.ts';
 
 const now = new Date('2026-11-09T10:00:00.000Z');
 const base = {
@@ -51,4 +51,13 @@ test('application draft uses only profile skills and marks missing skills', () =
   assert.deepEqual(draft.missing_skills, ['Docker']);
   assert.ok(draft.body.includes('I have built frontend applications.'));
   assert.ok(draft.disclaimer.includes('submit manually'));
+});
+
+test('outcome feedback stays neutral until enough outcomes exist and is bounded afterward', () => {
+  assert.deepEqual(calculateOutcomeAdjustment(['interview', 'won']), { adjustment: 0, sample_size: 2, confidence: 'insufficient' });
+  const positive = calculateOutcomeAdjustment(['response_received', 'interview', 'offer', 'won']);
+  const negative = calculateOutcomeAdjustment(['rejected', 'no_response', 'lost']);
+  assert.ok(positive.adjustment > 0);
+  assert.ok(negative.adjustment < 0);
+  assert.ok(positive.adjustment <= 8);
 });

@@ -79,7 +79,7 @@ export function calculateOpportunityPriority(input: {
   } else {
     freshness = -5;
   }
-  return Math.round(Math.min(100, Math.max(0, fit * 0.55 + quality * 0.4 + urgency + freshness)));
+  const feedback = Math.max(-8, Math.min(8, Number(input.outcomeAdjustment) || 0));\n  return Math.round(Math.min(100, Math.max(0, fit * 0.55 + quality * 0.4 + urgency + freshness + feedback)));
 }
 
 export function buildApplicationDraft(
@@ -119,4 +119,14 @@ export function buildApplicationDraft(
     missing_skills: missing,
     disclaimer: 'Draft only. Review every claim, add portfolio evidence, and submit manually. Alveron Labs has not contacted the organization.',
   };
+}
+
+export function calculateOutcomeAdjustment(events: string[]): { adjustment: number; sample_size: number; confidence: 'insufficient' | 'early' | 'useful' } {
+  const recognized = events.filter((event) => ['response_received', 'interview', 'offer', 'won', 'rejected', 'no_response', 'lost'].includes(event));
+  if (recognized.length < 3) return { adjustment: 0, sample_size: recognized.length, confidence: 'insufficient' };
+  const positive = recognized.filter((event) => ['response_received', 'interview', 'offer', 'won'].includes(event)).length;
+  const negative = recognized.filter((event) => ['rejected', 'no_response', 'lost'].includes(event)).length;
+  const rate = (positive - negative) / recognized.length;
+  const adjustment = Math.round(Math.max(-8, Math.min(8, rate * 10)));
+  return { adjustment, sample_size: recognized.length, confidence: recognized.length >= 10 ? 'useful' : 'early' };
 }
