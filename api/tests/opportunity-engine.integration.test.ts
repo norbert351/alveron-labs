@@ -80,6 +80,15 @@ test('opportunity records validate, deduplicate, list and update', async () => {
 });
 
 test('matching produces an explainable score and rejects unsafe input', async () => {
+  const assessed = await request('/api/opportunity-records/' + createdId + '/assess', 'POST', {});
+  assert.equal(assessed.status, 200);
+  assert.ok(assessed.body.quality.score >= 0);
+
+  const draft = await request('/api/opportunity-records/' + createdId + '/application-draft', 'POST', {});
+  assert.equal(draft.status, 200);
+  assert.ok(draft.body.draft.body.includes('CI test profile'));
+  assert.ok(draft.body.draft.disclaimer.includes('submit manually'));
+
   const scored = await request('/api/opportunity-records/' + createdId + '/score', 'POST', {});
   assert.equal(scored.status, 200);
   assert.equal(Number(scored.body.match.score), 100);
@@ -115,4 +124,19 @@ test('discovery run history endpoint is available', async () => {
   const result = await request('/api/opportunity-discovery/runs?limit=5');
   assert.equal(result.status, 200);
   assert.ok(Array.isArray(result.body.runs));
+});
+
+test('opportunity intelligence summary, briefing and learning endpoints are available', async () => {
+  const summary = await request('/api/opportunity-intelligence/summary');
+  assert.equal(summary.status, 200);
+  assert.ok(Number(summary.body.summary.total) >= 1);
+  assert.ok(Array.isArray(summary.body.by_type));
+
+  const briefing = await request('/api/opportunity-intelligence/briefing?limit=5');
+  assert.equal(briefing.status, 200);
+  assert.ok(Array.isArray(briefing.body.opportunities));
+
+  const learning = await request('/api/opportunity-intelligence/learning');
+  assert.equal(learning.status, 200);
+  assert.ok(Array.isArray(learning.body.by_type));
 });
