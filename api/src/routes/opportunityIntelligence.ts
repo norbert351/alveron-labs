@@ -29,7 +29,16 @@ export function registerOpportunityIntelligenceRoutes(app: FastifyInstance) {
        LIMIT $1`,
       [limit]
     );
-    const outcomes = await pool.query(\n      `SELECT o.opportunity_type, oo.event_type FROM opportunity_outcomes oo JOIN opportunity_records o ON o.id = oo.opportunity_id WHERE oo.event_type IN ('response_received','interview','offer','won','rejected','no_response','lost')`\n    );\n    const eventsByType = new Map<string, string[]>();\n    for (const outcome of outcomes.rows) {\n      const events = eventsByType.get(outcome.opportunity_type) || [];\n      events.push(outcome.event_type);\n      eventsByType.set(outcome.opportunity_type, events);\n    }\n    const opportunities = result.rows.map((row) => {
+    const outcomes = await pool.query(
+      `SELECT o.opportunity_type, oo.event_type FROM opportunity_outcomes oo JOIN opportunity_records o ON o.id = oo.opportunity_id WHERE oo.event_type IN ('response_received','interview','offer','won','rejected','no_response','lost')`
+    );
+    const eventsByType = new Map<string, string[]>();
+    for (const outcome of outcomes.rows) {
+      const events = eventsByType.get(outcome.opportunity_type) || [];
+      events.push(outcome.event_type);
+      eventsByType.set(outcome.opportunity_type, events);
+    }
+    const opportunities = result.rows.map((row) => {
       const quality = assessOpportunityQuality(row);
       return {
         id: Number(row.id),
@@ -44,18 +53,34 @@ export function registerOpportunityIntelligenceRoutes(app: FastifyInstance) {
         deadline_at: row.deadline_at,
         fit_score: row.fit_score == null ? null : Number(row.fit_score),
         quality,
+        outcome_feedback: calculateOutcomeAdjustment(eventsByType.get(row.opportunity_type) || []),
         priority_score: calculateOpportunityPriority({
           fitScore: row.fit_score == null ? null : Number(row.fit_score),
           qualityScore: quality.score,
           deadlineAt: row.deadline_at,
           discoveredAt: row.discovered_at,
+          outcomeAdjustment: calculateOutcomeAdjustment(eventsByType.get(row.opportunity_type) || []).adjustment,
         }),
       };
     }).sort((a, b) => b.priority_score - a.priority_score);
     return reply.send({ generated_at: new Date().toISOString(), count: opportunities.length, opportunities });
   });
 
-  app.get('/api/opportunity-intelligence/learning', async (_req, reply) => {\n    const result = await pool.query(\n      `SELECT o.opportunity_type, oo.event_type, count(*)::int AS count FROM opportunity_outcomes oo JOIN opportunity_records o ON o.id = oo.opportunity_id GROUP BY o.opportunity_type, oo.event_type ORDER BY o.opportunity_type, oo.event_type`\n    );\n    const grouped = new Map<string, string[]>();\n    for (const row of result.rows) {\n      const events = grouped.get(row.opportunity_type) || [];\n      for (let index = 0; index < row.count; index++) events.push(row.event_type);\n      grouped.set(row.opportunity_type, events);\n    }\n    const byType = Array.from(grouped.entries()).map(([opportunity_type, events]) => ({ opportunity_type, ...calculateOutcomeAdjustment(events) }));\n    return reply.send({ by_type: byType, note: 'Outcome feedback is a small ranking adjustment, not a predictive hiring model. Types with fewer than three recorded outcomes are not adjusted.' });\n  });\n\n  app.post('/api/opportunity-records/:id/assess', async (req, reply) => {
+  app.get('/api/opportunity-intelligence/learning', async (_req, reply) => {
+    const result = await pool.query(
+      `SELECT o.opportunity_type, oo.event_type, count(*)::int AS count FROM opportunity_outcomes oo JOIN opportunity_records o ON o.id = oo.opportunity_id GROUP BY o.opportunity_type, oo.event_type ORDER BY o.opportunity_type, oo.event_type`
+    );
+    const grouped = new Map<string, string[]>();
+    for (const row of result.rows) {
+      const events = grouped.get(row.opportunity_type) || [];
+      for (let index = 0; index < row.count; index++) events.push(row.event_type);
+      grouped.set(row.opportunity_type, events);
+    }
+    const byType = Array.from(grouped.entries()).map(([opportunity_type, events]) => ({ opportunity_type, ...calculateOutcomeAdjustment(events) }));
+    return reply.send({ by_type: byType, note: 'Outcome feedback is a small ranking adjustment, not a predictive hiring model. Types with fewer than three recorded outcomes are not adjusted.' });
+  });
+
+  app.post('/api/opportunity-records/:id/assess', async (req, reply) => {
     const id = Number((req.params as any).id);
     if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'Invalid opportunity id' });
     const result = await pool.query('SELECT * FROM opportunity_records WHERE id = $1', [id]);

@@ -60,6 +60,7 @@ export function calculateOpportunityPriority(input: {
   qualityScore: number;
   deadlineAt?: string | Date | null;
   discoveredAt?: string | Date | null;
+  outcomeAdjustment?: number;
 }, now = new Date()): number {
   const fit = Math.min(100, Math.max(0, Number(input.fitScore) || 0));
   const quality = Math.min(100, Math.max(0, input.qualityScore));
@@ -79,7 +80,8 @@ export function calculateOpportunityPriority(input: {
   } else {
     freshness = -5;
   }
-  const feedback = Math.max(-8, Math.min(8, Number(input.outcomeAdjustment) || 0));\n  return Math.round(Math.min(100, Math.max(0, fit * 0.55 + quality * 0.4 + urgency + freshness + feedback)));
+  const feedback = Math.max(-8, Math.min(8, Number(input.outcomeAdjustment) || 0));
+  return Math.round(Math.min(100, Math.max(0, fit * 0.55 + quality * 0.4 + urgency + freshness + feedback)));
 }
 
 export function buildApplicationDraft(
