@@ -176,6 +176,7 @@ export default function OpportunityHubPage() {
           <div className="text-xs uppercase tracking-[0.18em] text-electric-bright">Alveron Labs / Discovery</div>
           <h1 className="mt-2 font-display text-2xl font-semibold tracking-tight text-ink">Opportunity Hub</h1>
           <p className="mt-1 max-w-2xl text-sm text-ink-muted">One review queue for paid work, contracts, client leads and research opportunities.</p>
+          <Link href="/opportunity-intelligence" className="mt-2 inline-flex text-xs text-electric-bright hover:underline">View intelligence briefing <ArrowUpRight size={12} className="ml-1" /></Link>
         </div>
         <div className="flex flex-wrap gap-2">
           <button className="btn-primary" onClick={() => void runDiscovery()} disabled={discoveryBusy}><RefreshCw size={14} className={discoveryBusy ? 'animate-spin' : ''} /> {discoveryBusy ? 'Discovering…' : 'Run discovery'}</button>
