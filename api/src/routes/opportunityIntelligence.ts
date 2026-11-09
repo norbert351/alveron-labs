@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { pool } from '../db.ts';
 import { assessOpportunityQuality, buildApplicationDraft, calculateOpportunityPriority, calculateOutcomeAdjustment } from '../opportunities/intelligence.ts';
+import { checkSourceReachability } from '../opportunities/sourceVerification.ts';
 
 export function registerOpportunityIntelligenceRoutes(app: FastifyInstance) {
   app.get('/api/opportunity-intelligence/summary', async (_req, reply) => {
@@ -78,6 +79,23 @@ export function registerOpportunityIntelligenceRoutes(app: FastifyInstance) {
     }
     const byType = Array.from(grouped.entries()).map(([opportunity_type, events]) => ({ opportunity_type, ...calculateOutcomeAdjustment(events) }));
     return reply.send({ by_type: byType, note: 'Outcome feedback is a small ranking adjustment, not a predictive hiring model. Types with fewer than three recorded outcomes are not adjusted.' });
+  });
+
+  app.post('/api/opportunity-records/:id/check-source', async (req, reply) => {
+    const id = Number((req.params as any).id);
+    if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'Invalid opportunity id' });
+    const result = await pool.query('SELECT id, source_url, qualification FROM opportunity_records WHERE id = $1', [id]);
+    if (!result.rowCount) return reply.code(404).send({ error: 'Opportunity not found' });
+    const check = await checkSourceReachability(String(result.rows[0].source_url));
+    await pool.query(
+      `UPDATE opportunity_records
+       SET qualification = COALESCE(qualification, '{}'::jsonb) || jsonb_build_object('source_check', $2::jsonb),
+           last_verified_at = CASE WHEN $3 = 'reachable' THEN now() ELSE last_verified_at END,
+           updated_at = now()
+       WHERE id = $1`,
+      [id, JSON.stringify(check), check.state]
+    );
+    return reply.send({ opportunity_id: id, source_check: check, verification_status: 'unchanged', note: 'A reachable URL confirms only that the source responded. Review the listing itself before treating the opportunity as open or verified.' });
   });
 
   app.post('/api/opportunity-records/:id/assess', async (req, reply) => {
