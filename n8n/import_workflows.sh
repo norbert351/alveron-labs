@@ -13,7 +13,7 @@ for w in d.get('data', []): print(' ', w.get('id'), w.get('name'), 'active:', w.
 print('count:', len(d.get('data', [])))
 "
 
-for f in alveron-company-analysis.json alveron-lead-discovery.json alveron-email-send.json alveron-follow-up.json alveron-opportunity-discovery.json; do
+for f in alveron-company-analysis.json alveron-lead-discovery.json alveron-email-send.json alveron-follow-up.json alveron-opportunity-discovery.json alveron-daily-opportunity-briefing.json; do
   echo "== importing $f =="
   python3 -c "
 import json
