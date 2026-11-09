@@ -8,6 +8,7 @@ import { registerSecurity } from './plugins/security.ts';
 import { registerCompanyRoutes } from './routes/companies.ts';
 import { registerOpportunityRoutes } from './routes/opportunities.ts';
 import { registerUnifiedOpportunityRoutes } from './routes/opportunityRecords.ts';
+import { registerOpportunityIntelligenceRoutes } from './routes/opportunityIntelligence.ts';
 import { registerProposalRoutes } from './routes/proposals.ts';
 import { registerOutreachRoutes } from './routes/outreach.ts';
 import { registerSettingsRoutes } from './routes/settings.ts';
@@ -91,6 +92,7 @@ async function main() {
   registerCompanyRoutes(app);
   registerOpportunityRoutes(app);
   registerUnifiedOpportunityRoutes(app);
+  registerOpportunityIntelligenceRoutes(app);
   registerProposalRoutes(app);
   registerOutreachRoutes(app);
   registerSettingsRoutes(app);

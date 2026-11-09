@@ -12,7 +12,7 @@
     "start": "tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
     "test": "node --test --import tsx tests/",
-    "test:unit": "node --test --import tsx tests/research.test.ts tests/scoring.test.ts tests/ssrf.test.ts tests/unified-opportunities-schema.test.ts",
+    "test:unit": "node --test --import tsx tests/research.test.ts tests/scoring.test.ts tests/ssrf.test.ts tests/unified-opportunities-schema.test.ts tests/opportunity-intelligence.test.ts",
     "test:integration:ci": "node --test --import tsx tests/opportunity-engine.integration.test.ts"
   },
   "dependencies": {
