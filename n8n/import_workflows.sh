@@ -14,6 +14,7 @@ WORKFLOWS=(
   alveron-email-send.json
   alveron-follow-up.json
   alveron-opportunity-discovery.json
+  alveron-company-intelligence-discovery.json
   alveron-daily-opportunity-briefing.json
 )
 
