@@ -1,0 +1,147 @@
+{
+  "name": "Alveron Open Company Intelligence Discovery",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "days",
+              "daysInterval": 1
+            }
+          ]
+        }
+      },
+      "id": "company-intelligence-daily-schedule",
+      "name": "Daily Company Research",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "alveron-company-intelligence",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "company-intelligence-manual-webhook",
+      "name": "Manual Research Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.ALVERON_API_URL || 'http://host.docker.internal:3100') + '/api/webhook/company-intelligence-discovery' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Key",
+              "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "company-intelligence-scheduled-run",
+      "name": "Run Daily Company Research",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.ALVERON_API_URL || 'http://host.docker.internal:3100') + '/api/webhook/company-intelligence-discovery' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Key",
+              "value": "={{ $env.ALVERON_WEBHOOK_TOKEN }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 600000
+        }
+      },
+      "id": "company-intelligence-manual-run",
+      "name": "Run Manual Company Research",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        280,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {}
+      },
+      "id": "company-intelligence-respond",
+      "name": "Return Research Summary",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        560,
+        240
+      ]
+    }
+  ],
+  "connections": {
+    "Daily Company Research": {
+      "main": [
+        [
+          {
+            "node": "Run Daily Company Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Research Trigger": {
+      "main": [
+        [
+          {
+            "node": "Run Manual Company Research",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Run Manual Company Research": {
+      "main": [
+        [
+          {
+            "node": "Return Research Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "active": false
+}
