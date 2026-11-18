@@ -57,7 +57,7 @@ tokens in the frontend.
 Both endpoints require Alveron's existing internal bearer token:
 
 - `POST /api/company-intelligence` is not exposed. The scheduled batch runs through the webhook below.\n- `GET /api/company-intelligence/candidates?limit=100` lists startup discovery candidates for human review.\n- `PATCH /api/company-intelligence/candidates/:id` marks a candidate as `reviewing` or `rejected`.\n- `POST /api/company-intelligence/candidates/:id/promote` adds a candidate to the company pipeline after a human supplies and verifies its company name and website.\n- `POST /api/companies/:id/intelligence/run` runs all configured source groups.
-- `GET /api/companies/:id/intelligence/findings?limit=100` returns evidence.\n- `POST /api/webhook/company-intelligence-discovery` runs startup discovery and researches up to ten existing companies per batch, protected by the webhook key.
+- `GET /api/companies/:id/intelligence/findings?limit=100` returns evidence.\n- `POST /api/webhook/company-intelligence-discovery` runs startup discovery and researches up to five existing companies per batch, protected by the webhook key.
 
 Each finding includes category, source name, original URL, title, evidence text,
 published date when available, collection time and source metadata. Duplicate
