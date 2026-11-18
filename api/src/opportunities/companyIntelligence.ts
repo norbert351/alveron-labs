@@ -115,7 +115,7 @@ async function discoverCompanySignals(company: { id: number; name: string; websi
     { q: `site:crunchbase.com/organization "${company.name}"`, label: 'SearXNG / Crunchbase index' },
     { q: `site:wellfound.com/company "${company.name}"`, label: 'SearXNG / Wellfound index' },
   ];
-  const results = await Promise.all(searches.map((item) => searchWeb(item.q, 'company_signal', item.label)));
+  const results = await Promise.all(searches.map((item) => searchWeb(item.q, 'company_signal', item.label).catch(() => [])));
   return results.flat();
 }
 
@@ -127,7 +127,7 @@ async function discoverCustomerPain(company: { name: string; website: string }):
     { q: `site:capterra.com "${company.name}" reviews complaints`, label: 'SearXNG / Capterra reviews' },
     { q: `site:trustpilot.com/review "${host}"`, label: 'SearXNG / Trustpilot reviews' },
   ];
-  const results = await Promise.all(searches.map((item) => searchWeb(item.q, 'customer_pain', item.label)));
+  const results = await Promise.all(searches.map((item) => searchWeb(item.q, 'customer_pain', item.label).catch(() => [])));
   return results.flat();
 }
 
@@ -281,6 +281,7 @@ export async function discoverCompanyCandidates() {
       url.searchParams.set('q', search.query);
       url.searchParams.set('format', 'json');
       url.searchParams.set('language', 'en');
+      url.searchParams.set('time_range', 'month');
       const data = await getJson(url.toString());
       const items = Array.isArray(data?.results) ? data.results.slice(0, maxResults) : [];
       fetched += items.length;
