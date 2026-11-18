@@ -112,6 +112,8 @@ async function discoverCompanySignals(company: { id: number; name: string; websi
     { q: `"${company.name}" funding investment expansion hiring`, label: 'SearXNG / growth signals' },
     { q: `site:ycombinator.com/companies "${company.name}"`, label: 'SearXNG / YC directory' },
     { q: `site:producthunt.com/products "${company.name}"`, label: 'SearXNG / Product Hunt index' },
+    { q: `site:crunchbase.com/organization "${company.name}"`, label: 'SearXNG / Crunchbase index' },
+    { q: `site:wellfound.com/company "${company.name}"`, label: 'SearXNG / Wellfound index' },
   ];
   const results = await Promise.all(searches.map((item) => searchWeb(item.q, 'company_signal', item.label)));
   return results.flat();
@@ -248,4 +250,55 @@ export async function runAllCompanyIntelligence() {
     }), { fetched: 0, stored: 0 }),
     results,
   };
+}
+
+
+export async function discoverCompanyCandidates() {
+  const base = searxngEndpoint();
+  if (!base) return { status: 'skipped' as const, fetched: 0, inserted: 0, error: 'SearXNG is not configured' };
+  const searches = [
+    { source: 'YC public directory index', query: 'site:ycombinator.com/companies startup company batch' },
+    { source: 'Product Hunt public launch index', query: 'site:producthunt.com/products new product launch startup' },
+    { source: 'Wellfound public company index', query: 'site:wellfound.com/company startup hiring' },
+    { source: 'Crunchbase public company index', query: 'site:crunchbase.com/organization startup funding company' },
+  ];
+  let fetched = 0;
+  let inserted = 0;
+  for (const search of searches) {
+    try {
+      const url = new URL(base + '/search');
+      url.searchParams.set('q', search.query);
+      url.searchParams.set('format', 'json');
+      url.searchParams.set('language', 'en');
+      const data = await getJson(url.toString());
+      const items = Array.isArray(data?.results) ? data.results.slice(0, maxResults) : [];
+      fetched += items.length;
+      for (const item of items) {
+        const sourceUrl = safeUrl(item.url);
+        const title = clean(item.title, 500);
+        const evidence = clean(item.content || item.title, 4000);
+        if (!sourceUrl || !title || !evidence) continue;
+        const result = await pool.query(
+          `INSERT INTO company_discovery_candidates (source_name, source_url, title, evidence_text, metadata)
+           VALUES ($1,$2,$3,$4,$5::jsonb)
+           ON CONFLICT (source_url) DO NOTHING RETURNING id`,
+          [search.source, sourceUrl, title, evidence, JSON.stringify({ query: search.query, engine: item.engine || null, engines: item.engines || [] })]
+        );
+        if (result.rowCount) inserted++;
+      }
+    } catch {
+      // One directory outage must not prevent the remaining discovery sources.
+    }
+  }
+  return { status: 'completed' as const, fetched, inserted };
+}
+
+export async function listCompanyDiscoveryCandidates(limit = 100) {
+  const safeLimit = Math.min(500, Math.max(1, Math.floor(limit) || 100));
+  const result = await pool.query(
+    `SELECT id, source_name, source_url, title, evidence_text, status, metadata, discovered_at, reviewed_at
+     FROM company_discovery_candidates ORDER BY discovered_at DESC LIMIT $1`,
+    [safeLimit]
+  );
+  return result.rows;
 }
