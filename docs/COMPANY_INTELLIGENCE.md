@@ -52,12 +52,38 @@ If the API runs in Docker, use the private Docker network service name or the
 host gateway address instead of localhost. Do not put SearXNG credentials or
 tokens in the frontend.
 
+## Local AI synthesis
+
+The evidence collector can create a research report with a local Ollama model.
+No hosted inference API or paid model key is used by this module. Start the
+optional model container:
+
+```bash
+cd research
+docker compose --profile local-ai up -d ollama
+docker compose --profile local-ai exec ollama ollama pull qwen2.5:1.5b
+```
+
+Set these values in the API's private `api/.env`:
+
+```env
+ALVERON_COMPANY_INTELLIGENCE_LLM_URL=http://127.0.0.1:11434/v1
+ALVERON_COMPANY_INTELLIGENCE_LLM_MODEL=qwen2.5:1.5b
+ALVERON_COMPANY_INTELLIGENCE_LLM_TIMEOUT_MS=120000
+```
+
+The API accepts only local Ollama hostnames for this feature. If the model is
+not configured or is unavailable, source collection still works and the report
+status explains why synthesis was skipped or failed. Model inference is CPU
+and memory intensive. The 1.5B model is a lightweight starting point, and
+report quality should be checked against the cited source evidence.
+
 ## API
 
 Both endpoints require Alveron's existing internal bearer token:
 
 - `POST /api/company-intelligence` is not exposed. The scheduled batch runs through the webhook below.\n- `GET /api/company-intelligence/candidates?limit=100` lists startup discovery candidates for human review.\n- `PATCH /api/company-intelligence/candidates/:id` marks a candidate as `reviewing` or `rejected`.\n- `POST /api/company-intelligence/candidates/:id/promote` adds a candidate to the company pipeline after a human supplies and verifies its company name and website.\n- `POST /api/companies/:id/intelligence/run` runs all configured source groups.
-- `GET /api/companies/:id/intelligence/findings?limit=100` returns evidence.\n- `POST /api/webhook/company-intelligence-discovery` runs startup discovery and researches up to five existing companies per batch, protected by the webhook key.
+- `GET /api/companies/:id/intelligence/findings?limit=100` returns evidence.\n- `GET /api/companies/:id/intelligence/report` returns the latest locally generated AI report.\n- `POST /api/webhook/company-intelligence-discovery` runs startup discovery and researches up to five existing companies per batch, protected by the webhook key.
 
 Each finding includes category, source name, original URL, title, evidence text,
 published date when available, collection time and source metadata. Duplicate
