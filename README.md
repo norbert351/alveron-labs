@@ -14,7 +14,7 @@ auto-sending. Every email requires explicit human approval.
 - `web/` — Next.js App Router dashboard (Obsidian theme, Tailwind)
 - `n8n/workflows/` — importable n8n orchestration workflows
 - Unified Opportunity Hub — one review feed for remote jobs, paid tasks, agency contracts, business leads, paid research and technical content
-- `docs/` — architecture, API, n8n, and security docs
+- `research/` — self-hosted SearXNG search service for public web research\n- `docs/` — architecture, API, n8n, and security docs
 
 ## Workflow
 
@@ -28,7 +28,7 @@ Company URL → Website fetch (+headless SPA fallback) → Company Research
 
 ## Unified opportunity discovery
 
-The dashboard includes `/opportunity-hub` for the normalized opportunity feed and `/opportunity-profile` for skills, experience, location, compensation and work preferences. The API currently ingests RemoteOK and Remotive public remote-job feeds, scans recent Hacker News comments for explicit paid-work signals, and imports existing Alveron global business research opportunities. Provider results keep source attribution and direct links. The n8n workflow `alveron-opportunity-discovery.json` can schedule discovery every six hours after it is imported and activated. See `docs/UNIFIED_OPPORTUNITIES.md` for provider terms, API routes and setup.
+The dashboard includes `/opportunity-hub` for the normalized opportunity feed and `/opportunity-profile` for skills, experience, location, compensation and work preferences. The API currently ingests RemoteOK and Remotive public remote-job feeds, scans recent Hacker News comments for explicit paid-work signals, and imports existing Alveron global business research opportunities. Provider results keep source attribution and direct links. The n8n workflow `alveron-opportunity-discovery.json` can schedule discovery every six hours after it is imported and activated. See `docs/UNIFIED_OPPORTUNITIES.md` for provider terms, API routes and setup. The multi-angle company research module uses self-hosted SearXNG, GitHub public issues, Hacker News and an open technology fingerprint. See `docs/COMPANY_INTELLIGENCE.md`.
 
 The opportunity matcher is an explainable first-pass rules engine. It shows skill overlap and missing skills, and applies the profile constraints it can verify from source data. The hub also records human-reviewed approval, application and outcome history. It does not submit applications or contact prospects.
 
