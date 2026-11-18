@@ -21,7 +21,7 @@ Add a daily schedule at 04:15 server time:
 15 4 * * * /usr/local/bin/alveron-company-intelligence >> /var/log/alveron-company-intelligence.log 2>&1
 ```
 
-The API must be running and configured with `ALVERON_SEARXNG_URL`. Start the
+The API must be running and configured with `ALVERON_SEARXNG_URL`. For local AI summaries, start the optional Ollama profile and set `ALVERON_COMPANY_INTELLIGENCE_LLM_URL=http://127.0.0.1:11434/v1` plus `ALVERON_COMPANY_INTELLIGENCE_LLM_MODEL=qwen2.5:1.5b` in the API environment. Start the
 SearXNG service from `research/` as described in
 `docs/COMPANY_INTELLIGENCE.md`. The batch discovers public startup candidates
 and investigates up to ten existing company records per run. It only collects
