@@ -69,7 +69,15 @@ export function registerCompanyIntelligenceRoutes(app: FastifyInstance) {
     }
   });
 
-  app.get('/api/companies/:id/intelligence/report', async (req, reply) => {\n    const id = Number((req.params as any).id);\n    if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'Invalid company id' });\n    const report = await getLatestCompanyIntelligenceReport(id);\n    if (!report) return reply.code(404).send({ error: 'No local AI report yet. Configure Ollama and run company intelligence.' });\n    return reply.send({ report });\n  });\n\n  app.get('/api/companies/:id/intelligence/findings', async (req, reply) => {
+  app.get('/api/companies/:id/intelligence/report', async (req, reply) => {
+    const id = Number((req.params as any).id);
+    if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'Invalid company id' });
+    const report = await getLatestCompanyIntelligenceReport(id);
+    if (!report) return reply.code(404).send({ error: 'No local AI report yet. Configure Ollama and run company intelligence.' });
+    return reply.send({ report });
+  });
+
+  app.get('/api/companies/:id/intelligence/findings', async (req, reply) => {
     const id = Number((req.params as any).id);
     if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'Invalid company id' });
     const query = req.query as Record<string, string | undefined>;
