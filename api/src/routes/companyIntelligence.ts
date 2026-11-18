@@ -41,7 +41,7 @@ export function registerCompanyIntelligenceRoutes(app: FastifyInstance) {
     const rawWebsite = String(body.website || '').trim();
     if (!Number.isSafeInteger(id) || id <= 0) return reply.code(400).send({ error: 'Invalid candidate id' });
     if (!name || !rawWebsite) return reply.code(400).send({ error: 'A company name and verified website are required' });
-    const website = /^https?:\\/\\//i.test(rawWebsite) ? rawWebsite : 'https://' + rawWebsite;
+    const website = rawWebsite.startsWith('http://') || rawWebsite.startsWith('https://') ? rawWebsite : 'https://' + rawWebsite;
     let parsed: URL;
     try { parsed = new URL(website); } catch { return reply.code(400).send({ error: 'Invalid website URL' }); }
     if (!['http:', 'https:'].includes(parsed.protocol) || !parsed.hostname.includes('.')) return reply.code(400).send({ error: 'Invalid website URL' });
