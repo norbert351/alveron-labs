@@ -230,8 +230,9 @@ export async function listCompanyIntelligenceFindings(companyId: number, limit =
 
 
 export async function runAllCompanyIntelligence() {
+  const candidateDiscovery = await discoverCompanyCandidates();
   const companies = await pool.query(
-    `SELECT id FROM companies ORDER BY updated_at DESC NULLS LAST, id DESC LIMIT 30`
+    `SELECT id FROM companies ORDER BY updated_at DESC NULLS LAST, id DESC LIMIT 10`
   );
   const results: Array<{ companyId: number; result?: Awaited<ReturnType<typeof runCompanyIntelligence>>; error?: string }> = [];
   for (const row of companies.rows) {
@@ -243,6 +244,8 @@ export async function runAllCompanyIntelligence() {
     }
   }
   return {
+    candidates_discovered: candidateDiscovery.inserted,
+    candidate_search_status: candidateDiscovery.status,
     companies_processed: results.length,
     totals: results.reduce((acc, item) => ({
       fetched: acc.fetched + (item.result?.totals.fetched || 0),
