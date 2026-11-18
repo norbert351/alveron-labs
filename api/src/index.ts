@@ -6,6 +6,7 @@ import { initDb, pool } from './db.ts';
 import { config } from './config.ts';
 import { registerSecurity } from './plugins/security.ts';
 import { registerCompanyRoutes } from './routes/companies.ts';
+import { registerCompanyIntelligenceRoutes } from './routes/companyIntelligence.ts';
 import { registerOpportunityRoutes } from './routes/opportunities.ts';
 import { registerUnifiedOpportunityRoutes } from './routes/opportunityRecords.ts';
 import { registerOpportunityIntelligenceRoutes } from './routes/opportunityIntelligence.ts';
@@ -90,6 +91,7 @@ async function main() {
   app.get('/api/health', async () => ({ ok: true, service: 'alveron-labs-api' }));
 
   registerCompanyRoutes(app);
+  registerCompanyIntelligenceRoutes(app);
   registerOpportunityRoutes(app);
   registerUnifiedOpportunityRoutes(app);
   registerOpportunityIntelligenceRoutes(app);
