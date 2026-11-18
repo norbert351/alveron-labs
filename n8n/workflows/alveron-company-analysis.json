@@ -20,7 +20,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "http://127.0.0.1:3100/api/webhook/company",
+        "url": "={{ ($env.ALVERON_API_URL || 'http://host.docker.internal:3100') + '/api/webhook/company' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -62,7 +62,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=http://127.0.0.1:3100/api/webhook/company/{{ $('Create Company').item.json.company.id }}/status",
+        "url": "={{ ($env.ALVERON_API_URL || 'http://host.docker.internal:3100') + '/api/webhook/company/' + $('Create Company').item.json.company.id + '/status' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -179,7 +179,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=http://127.0.0.1:3100/api/webhook/company/{{ $('Create Company').item.json.company.id }}/research",
+        "url": "={{ ($env.ALVERON_API_URL || 'http://host.docker.internal:3100') + '/api/webhook/company/' + $('Create Company').item.json.company.id + '/research' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -203,7 +203,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "=http://127.0.0.1:3100/api/webhook/company/{{ $('Create Company').item.json.company.id }}/opportunities",
+        "url": "={{ ($env.ALVERON_API_URL || 'http://host.docker.internal:3100') + '/api/webhook/company/' + $('Create Company').item.json.company.id + '/opportunities' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -227,7 +227,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://127.0.0.1:3100/api/webhook/opportunity/{{ $json.opportunities[0].id }}/proposal",
+        "url": "={{ ($env.ALVERON_API_URL || 'http://host.docker.internal:3100') + '/api/webhook/opportunity/' + $json.opportunities[0].id + '/proposal' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

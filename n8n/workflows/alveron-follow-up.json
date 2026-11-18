@@ -28,7 +28,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "http://127.0.0.1:3100/api/webhook/follow-up-due",
+        "url": "={{ ($env.ALVERON_API_URL || 'http://host.docker.internal:3100') + '/api/webhook/follow-up-due' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -83,7 +83,7 @@
     {
       "parameters": {
         "method": "POST",
-        "url": "=http://127.0.0.1:3100/api/webhook/outreach/{{ $('Split Out Items').item.json.outreach_id }}/message",
+        "url": "={{ ($env.ALVERON_API_URL || 'http://host.docker.internal:3100') + '/api/webhook/outreach/' + $('Split Out Items').item.json.outreach_id + '/message' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

@@ -6,7 +6,10 @@ import { initDb, pool } from './db.ts';
 import { config } from './config.ts';
 import { registerSecurity } from './plugins/security.ts';
 import { registerCompanyRoutes } from './routes/companies.ts';
+import { registerCompanyIntelligenceRoutes } from './routes/companyIntelligence.ts';
 import { registerOpportunityRoutes } from './routes/opportunities.ts';
+import { registerUnifiedOpportunityRoutes } from './routes/opportunityRecords.ts';
+import { registerOpportunityIntelligenceRoutes } from './routes/opportunityIntelligence.ts';
 import { registerProposalRoutes } from './routes/proposals.ts';
 import { registerOutreachRoutes } from './routes/outreach.ts';
 import { registerSettingsRoutes } from './routes/settings.ts';
@@ -33,7 +36,6 @@ async function main() {
     `UPDATE research_reports SET status = 'failed', error = 'API restarted while report was active'
      WHERE status IN ('pending', 'running')`
   ).catch(() => {});
-  // Phase 12 research engine: mark in-flight runs as failed so they can be re-run.
   await pool.query(
     `UPDATE research_runs SET status = 'failed', error = 'API restarted while research run was active', completed_at = now()
      WHERE status IN ('pending', 'running')`
@@ -62,10 +64,9 @@ async function main() {
         res: (res: any) => ({ statusCode: res.statusCode }),
       },
     },
-    genReqId: () => crypto.randomUUID(),
+    genReqId: () => randomUUID(),
     bodyLimit: 4 * 1024 * 1024,
   });
-  // CSV import support
   app.addContentTypeParser('text/csv', { parseAs: 'string' }, (_req, body, done) => {
     done(null, body);
   });
@@ -90,7 +91,10 @@ async function main() {
   app.get('/api/health', async () => ({ ok: true, service: 'alveron-labs-api' }));
 
   registerCompanyRoutes(app);
+  registerCompanyIntelligenceRoutes(app);
   registerOpportunityRoutes(app);
+  registerUnifiedOpportunityRoutes(app);
+  registerOpportunityIntelligenceRoutes(app);
   registerProposalRoutes(app);
   registerOutreachRoutes(app);
   registerSettingsRoutes(app);
