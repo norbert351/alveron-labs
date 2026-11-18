@@ -24,7 +24,7 @@
     },
     {
       "parameters": {
-        "url": "={{ ($env.ALVERON_API_BASE || 'http://127.0.0.1:3100') + '/api/opportunity-intelligence/briefing?limit=10' }}",
+        "url": "={{ ($env.ALVERON_API_BASE || 'http://host.docker.internal:3100') + '/api/opportunity-intelligence/briefing?limit=10' }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
