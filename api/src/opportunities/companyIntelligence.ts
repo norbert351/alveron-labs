@@ -132,38 +132,46 @@ async function discoverCustomerPain(company: { name: string; website: string }):
 }
 
 async function discoverTechnicalSignals(company: { name: string; website: string }): Promise<FindingInput[]> {
-  const host = new URL(company.website).hostname.replace(/^www\./, '');
+  const host = new URL(company.website).hostname.replace(/^www\\./, '');
   const findings: FindingInput[] = [];
   const githubQuery = encodeURIComponent(`"${company.name}" OR "${host}"`);
-  let github: any = { items: [] };\n  try { github = await getJson(`https://api.github.com/search/issues?q=${githubQuery}+is:issue&sort=updated&order=desc&per_page=${maxResults}`, {
-    Accept: 'application/vnd.github+json',
-    ...(process.env.GITHUB_TOKEN ? { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}),
-    'X-GitHub-Api-Version': '2022-11-28',
-  });
-  for (const item of (Array.isArray(github?.items) ? github.items : [])) {
-    findings.push({
-      category: 'technical_signal', source: 'GitHub public issues', url: item.html_url,
-      title: clean(item.title, 500), summary: clean(item.body || item.title, 4000),
-      publishedAt: item.updated_at || item.created_at,
-      metadata: { state: item.state, comments: item.comments, repository_url: item.repository_url, labels: (item.labels || []).map((label: any) => label.name) },
+  try {
+    const github = await getJson(`https://api.github.com/search/issues?q=${githubQuery}+is:issue&sort=updated&order=desc&per_page=${maxResults}`, {
+      Accept: 'application/vnd.github+json',
+      ...(process.env.GITHUB_TOKEN ? { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}),
+      'X-GitHub-Api-Version': '2022-11-28',
     });
+    for (const item of (Array.isArray(github?.items) ? github.items : [])) {
+      findings.push({
+        category: 'technical_signal', source: 'GitHub public issues', url: item.html_url,
+        title: clean(item.title, 500), summary: clean(item.body || item.title, 4000),
+        publishedAt: item.updated_at || item.created_at,
+        metadata: { state: item.state, comments: item.comments, repository_url: item.repository_url, labels: (item.labels || []).map((label: any) => label.name) },
+      });
+    }
+  } catch {
+    // GitHub rate limits must not suppress Hacker News research.
   }
-  const hnUrl = new URL('https://hn.algolia.com/api/v1/search_by_date');
-  hnUrl.searchParams.set('query', company.name);
-  hnUrl.searchParams.set('tags', 'story,comment');
-  hnUrl.searchParams.set('hitsPerPage', String(maxResults));
-  const hn = await getJson(hnUrl.toString());
-  for (const item of (Array.isArray(hn?.hits) ? hn.hits : [])) {
-    const id = String(item.objectID || '');
-    if (!id) continue;
-    findings.push({
-      category: 'technical_signal', source: 'Hacker News public API',
-      url: 'https://news.ycombinator.com/item?id=' + encodeURIComponent(id),
-      title: clean(item.story_title || item.title || 'Hacker News discussion', 500),
-      summary: clean(item.comment_text || item.story_text || item.title, 4000),
-      publishedAt: item.created_at || null,
-      metadata: { author: item.author || null, points: item.points || null, num_comments: item.num_comments || null },
-    });
+  try {
+    const hnUrl = new URL('https://hn.algolia.com/api/v1/search_by_date');
+    hnUrl.searchParams.set('query', company.name);
+    hnUrl.searchParams.set('tags', 'story,comment');
+    hnUrl.searchParams.set('hitsPerPage', String(maxResults));
+    const hn = await getJson(hnUrl.toString());
+    for (const item of (Array.isArray(hn?.hits) ? hn.hits : [])) {
+      const id = String(item.objectID || '');
+      if (!id) continue;
+      findings.push({
+        category: 'technical_signal', source: 'Hacker News public API',
+        url: 'https://news.ycombinator.com/item?id=' + encodeURIComponent(id),
+        title: clean(item.story_title || item.title || 'Hacker News discussion', 500),
+        summary: clean(item.comment_text || item.story_text || item.title, 4000),
+        publishedAt: item.created_at || null,
+        metadata: { author: item.author || null, points: item.points || null, num_comments: item.num_comments || null },
+      });
+    }
+  } catch {
+    // Preserve GitHub findings if Hacker News is unavailable.
   }
   return findings;
 }
