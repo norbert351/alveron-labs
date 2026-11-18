@@ -225,3 +225,27 @@ export async function listCompanyIntelligenceFindings(companyId: number, limit =
   );
   return result.rows;
 }
+
+
+export async function runAllCompanyIntelligence() {
+  const companies = await pool.query(
+    `SELECT id FROM companies ORDER BY updated_at DESC NULLS LAST, id DESC LIMIT 30`
+  );
+  const results: Array<{ companyId: number; result?: Awaited<ReturnType<typeof runCompanyIntelligence>>; error?: string }> = [];
+  for (const row of companies.rows) {
+    const companyId = Number(row.id);
+    try {
+      results.push({ companyId, result: await runCompanyIntelligence(companyId) });
+    } catch (error) {
+      results.push({ companyId, error: error instanceof Error ? error.message.slice(0, 300) : 'Unknown error' });
+    }
+  }
+  return {
+    companies_processed: results.length,
+    totals: results.reduce((acc, item) => ({
+      fetched: acc.fetched + (item.result?.totals.fetched || 0),
+      stored: acc.stored + (item.result?.totals.stored || 0),
+    }), { fetched: 0, stored: 0 }),
+    results,
+  };
+}
