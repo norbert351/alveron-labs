@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import { runCompanyIntelligence, runAllCompanyIntelligence, listCompanyIntelligenceFindings } from '../opportunities/companyIntelligence.ts';
+import { runCompanyIntelligence, runAllCompanyIntelligence, listCompanyIntelligenceFindings, listCompanyDiscoveryCandidates } from '../opportunities/companyIntelligence.ts';
 
 export function registerCompanyIntelligenceRoutes(app: FastifyInstance) {
   let batchInProgress = false;
@@ -11,6 +11,12 @@ export function registerCompanyIntelligenceRoutes(app: FastifyInstance) {
     } finally {
       batchInProgress = false;
     }
+  });
+
+  app.get('/api/company-intelligence/candidates', async (req, reply) => {
+    const query = req.query as Record<string, string | undefined>;
+    const candidates = await listCompanyDiscoveryCandidates(Number(query.limit) || 100);
+    return reply.send({ candidates, total: candidates.length });
   });
 
   app.post('/api/companies/:id/intelligence/run', async (req, reply) => {
