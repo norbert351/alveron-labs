@@ -106,6 +106,16 @@ async function searchWeb(query: string, category: FindingInput['category'], sour
   })).filter((item: FindingInput) => Boolean(safeUrl(item.url) && item.title && item.summary));
 }
 
+async function mapConcurrent<T, R>(items: T[], concurrency: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const output: R[] = [];
+  const width = Math.max(1, Math.floor(concurrency));
+  for (let index = 0; index < items.length; index += width) {
+    const batch = await Promise.all(items.slice(index, index + width).map(fn));
+    output.push(...batch);
+  }
+  return output;
+}
+
 async function discoverCompanySignals(company: { id: number; name: string; website: string }): Promise<FindingInput[]> {
   const searches = [
     { q: `"${company.name}" startup launch founder product`, label: 'SearXNG / startup discovery' },
@@ -115,7 +125,7 @@ async function discoverCompanySignals(company: { id: number; name: string; websi
     { q: `site:crunchbase.com/organization "${company.name}"`, label: 'SearXNG / Crunchbase index' },
     { q: `site:wellfound.com/company "${company.name}"`, label: 'SearXNG / Wellfound index' },
   ];
-  const results = await Promise.all(searches.map((item) => searchWeb(item.q, 'company_signal', item.label).catch(() => [])));
+  const results = await mapConcurrent(searches, 2, (item) => searchWeb(item.q, 'company_signal', item.label).catch(() => []));
   return results.flat();
 }
 
@@ -127,7 +137,7 @@ async function discoverCustomerPain(company: { name: string; website: string }):
     { q: `site:capterra.com "${company.name}" reviews complaints`, label: 'SearXNG / Capterra reviews' },
     { q: `site:trustpilot.com/review "${host}"`, label: 'SearXNG / Trustpilot reviews' },
   ];
-  const results = await Promise.all(searches.map((item) => searchWeb(item.q, 'customer_pain', item.label).catch(() => [])));
+  const results = await mapConcurrent(searches, 2, (item) => searchWeb(item.q, 'customer_pain', item.label).catch(() => []));
   return results.flat();
 }
 
@@ -240,7 +250,7 @@ export async function listCompanyIntelligenceFindings(companyId: number, limit =
 export async function runAllCompanyIntelligence() {
   const candidateDiscovery = await discoverCompanyCandidates();
   const companies = await pool.query(
-    `SELECT id FROM companies ORDER BY updated_at DESC NULLS LAST, id DESC LIMIT 10`
+    `SELECT c.id FROM companies c LEFT JOIN (SELECT company_id, max(created_at) AS last_researched FROM company_intelligence_findings GROUP BY company_id) f ON f.company_id = c.id ORDER BY f.last_researched ASC NULLS FIRST, c.updated_at DESC NULLS LAST LIMIT 5`
   );
   const results: Array<{ companyId: number; result?: Awaited<ReturnType<typeof runCompanyIntelligence>>; error?: string }> = [];
   for (const row of companies.rows) {
@@ -275,6 +285,7 @@ export async function discoverCompanyCandidates() {
   ];
   let fetched = 0;
   let inserted = 0;
+  let failedSources = 0;
   for (const search of searches) {
     try {
       const url = new URL(base + '/search');
@@ -299,10 +310,11 @@ export async function discoverCompanyCandidates() {
         if (result.rowCount) inserted++;
       }
     } catch {
+      failedSources++;
       // One directory outage must not prevent the remaining discovery sources.
     }
   }
-  return { status: 'completed' as const, fetched, inserted };
+  return { status: failedSources === searches.length ? 'failed' as const : failedSources ? 'partial' as const : 'completed' as const, fetched, inserted, failed_sources: failedSources };
 }
 
 export async function listCompanyDiscoveryCandidates(limit = 100) {
