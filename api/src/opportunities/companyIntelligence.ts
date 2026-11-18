@@ -1,6 +1,5 @@
 import { pool } from '../db.ts';
 import { assertSafeUrl } from '../ssrf.ts';
-import { config } from '../config.ts';
 
 type FindingInput = {
   category: 'company_signal' | 'customer_pain' | 'technical_signal' | 'technology_signal';
