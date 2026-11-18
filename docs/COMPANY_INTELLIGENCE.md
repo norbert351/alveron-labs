@@ -24,7 +24,7 @@ search engines and does not maintain its own web index. Results depend on
 upstream availability, indexing, and rate limits. A SearXNG result is a lead
 for investigation, not proof of a customer complaint or company claim.
 
-## Start SearXNG on the VPS
+## Scheduling\n\nFor a fully open-source scheduler, use Linux cron and the runner in `docs/COMPANY_INTELLIGENCE_CRON.md`. The n8n workflow is optional. Do not run both schedules at once.\n\n## Start SearXNG on the VPS
 
 From the repository root:
 
@@ -56,7 +56,7 @@ tokens in the frontend.
 
 Both endpoints require Alveron's existing internal bearer token:
 
-- `POST /api/company-intelligence` is not exposed. The scheduled batch runs through the webhook below.\n- `GET /api/company-intelligence/candidates?limit=100` lists startup discovery candidates for human review.\n- `POST /api/companies/:id/intelligence/run` runs all configured source groups.
+- `POST /api/company-intelligence` is not exposed. The scheduled batch runs through the webhook below.\n- `GET /api/company-intelligence/candidates?limit=100` lists startup discovery candidates for human review.\n- `PATCH /api/company-intelligence/candidates/:id` marks a candidate as `reviewing` or `rejected`.\n- `POST /api/company-intelligence/candidates/:id/promote` adds a candidate to the company pipeline after a human supplies and verifies its company name and website.\n- `POST /api/companies/:id/intelligence/run` runs all configured source groups.
 - `GET /api/companies/:id/intelligence/findings?limit=100` returns evidence.\n- `POST /api/webhook/company-intelligence-discovery` runs startup discovery and researches up to ten existing companies per batch, protected by the webhook key.
 
 Each finding includes category, source name, original URL, title, evidence text,
