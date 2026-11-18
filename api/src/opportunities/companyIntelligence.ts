@@ -135,7 +135,7 @@ async function discoverTechnicalSignals(company: { name: string; website: string
   const host = new URL(company.website).hostname.replace(/^www\./, '');
   const findings: FindingInput[] = [];
   const githubQuery = encodeURIComponent(`"${company.name}" OR "${host}"`);
-  const github = await getJson(`https://api.github.com/search/issues?q=${githubQuery}+is:issue&sort=updated&order=desc&per_page=${maxResults}`, {
+  let github: any = { items: [] };\n  try { github = await getJson(`https://api.github.com/search/issues?q=${githubQuery}+is:issue&sort=updated&order=desc&per_page=${maxResults}`, {
     Accept: 'application/vnd.github+json',
     ...(process.env.GITHUB_TOKEN ? { Authorization: 'Bearer ' + process.env.GITHUB_TOKEN } : {}),
     'X-GitHub-Api-Version': '2022-11-28',
