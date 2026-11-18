@@ -234,7 +234,8 @@ async function generateLocalCompanySummary(companyId: number, companyName: strin
     [companyId]
   );
   if (!evidence.rowCount) return { status: 'skipped' as const, reason: 'No evidence has been collected yet' };
-  const endpoint = base.toString().replace(/\\/+$/, '') + '/chat/completions';
+  const baseUrl = base.toString();
+  const endpoint = (baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl) + '/chat/completions';
   try {
     const response = await fetch(endpoint, {
       method: 'POST',
