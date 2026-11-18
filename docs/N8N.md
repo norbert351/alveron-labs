@@ -99,7 +99,7 @@ settings in the n8n editor before activating any workflow. Re-running the import
 script can create duplicate workflows, so use it for initial import and manage
 later updates deliberately.
 
-The `alveron-company-intelligence-discovery.json` workflow runs once daily. It calls the API's protected company-intelligence webhook, discovers startup candidates through SearXNG, then researches up to ten existing companies per batch across startup signals, indexed customer complaints, GitHub issues, Hacker News and public technology fingerprints. Findings are stored for human review. It does not promote candidates or contact companies.\n\nThe daily opportunity briefing workflow runs at 08:30 in the configured
+The `alveron-company-intelligence-discovery.json` workflow runs once daily. It calls the API's protected company-intelligence webhook, discovers startup candidates through SearXNG, then researches up to five existing companies per batch across startup signals, indexed customer complaints, GitHub issues, Hacker News and public technology fingerprints. Findings are stored for human review. It does not promote candidates or contact companies.\n\nThe daily opportunity briefing workflow runs at 08:30 in the configured
 `GENERIC_TIMEZONE`. Telegram is optional. The briefing API and dashboard remain
 usable without Telegram credentials.
 
